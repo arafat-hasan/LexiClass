@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lexiclass"
+version = "0.1.0"
+description = "Extensible document classification toolkit (SVM-based) with similarity search"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Arafat Hasan" }]
+keywords = ["nlp", "classification", "svm", "text", "similarity", "gensim", "sklearn"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=1.22",
+  "scipy>=1.8",
+  "scikit-learn>=1.1",
+  "gensim>=4.3",
+  "beautifulsoup4>=4.12",
+  "typer[all]>=0.9",
+  "datasets>=2.12",
+]
+
+[project.optional-dependencies]
+icu = ["PyICU>=2.11"]
+dotenv = ["python-dotenv>=1.0"]
+
+[project.scripts]
+lexiclass = "lexiclass.cli.main:app"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lexiclass*"]
+
+[tool.setuptools.package-data]
+"lexiclass" = ["py.typed"]
+
+
