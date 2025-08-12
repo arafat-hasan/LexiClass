@@ -47,12 +47,23 @@ def build_index(
     locale: str = typer.Option('en', help="Tokenizer locale"),
     features: str = typer.Option('bow', help="Feature extractor plugin (e.g., bow)"),
     token_cache_path: Path | None = typer.Option(None, help="Optional JSONL(.gz) token cache to avoid double tokenization"),
+    parallel_io: bool = typer.Option(False, help="Use multithreaded file I/O for reading documents"),
+    num_workers: int = typer.Option(0, help="Number of I/O worker threads (0 = auto)"),
+    prefetch: int = typer.Option(64, help="Number of files to prefetch/buffer when using parallel I/O"),
+    ordered: bool = typer.Option(True, help="Preserve deterministic filename order when using parallel I/O"),
     verbose: bool = typer.Option(False, "-v", help="Deprecated: use global -v"),
 ) -> None:
     tokenizer_obj = registry.tokenizers[tokenizer](locale=locale)
     feature_extractor = registry.features[features]()
     index = DocumentIndex()
     def stream_factory() -> Iterator[Tuple[str, str]]:
+        if parallel_io:
+            return DocumentLoader.iter_documents_from_directory_parallel(
+                str(data_dir),
+                num_workers=None if num_workers <= 0 else num_workers,
+                prefetch=prefetch,
+                ordered=ordered,
+            )
         return DocumentLoader.iter_documents_from_directory(str(data_dir))
     index.build_index(
         feature_extractor=feature_extractor,

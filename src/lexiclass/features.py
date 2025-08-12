@@ -50,7 +50,7 @@ class FeatureExtractor:
 
         # Internal batching to reduce Python overhead of add_documents per doc
         # and to keep memory usage in check for very large corpora.
-        BATCH_SIZE = 2000
+        BATCH_SIZE = 1000
         PRUNE_AT = 2_000_000
 
         self.dictionary = corpora.Dictionary()
