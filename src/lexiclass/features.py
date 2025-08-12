@@ -4,7 +4,6 @@ import logging
 import time
 from typing import Iterable, List
 
-import numpy as np
 from gensim import corpora
 from scipy import sparse
 
@@ -49,22 +48,43 @@ class FeatureExtractor:
         start_time = time.time()
         logger.info("Creating dictionary from streaming documents")
 
+        # Internal batching to reduce Python overhead of add_documents per doc
+        # and to keep memory usage in check for very large corpora.
+        BATCH_SIZE = 2000
+        PRUNE_AT = 2_000_000
+
         self.dictionary = corpora.Dictionary()
+        batch: list[list[str]] = []
         num_docs_seen = 0
+
         for tokens in tokenized_documents_iter:
-            self.dictionary.add_documents([tokens])
+            batch.append(tokens)
             num_docs_seen += 1
+            if len(batch) >= BATCH_SIZE:
+                self.dictionary.add_documents(batch, prune_at=PRUNE_AT)
+                batch.clear()
             if num_docs_seen % 10000 == 0:
                 logger.info("Added %d documents to dictionary so far", num_docs_seen)
 
-        logger.info("Gensim dictionary (streaming) created in %.2f seconds from %d documents", time.time() - start_time, num_docs_seen)
+        if batch:
+            self.dictionary.add_documents(batch, prune_at=PRUNE_AT)
+
+        logger.info(
+            "Gensim dictionary (streaming) created in %.2f seconds from %d documents",
+            time.time() - start_time,
+            num_docs_seen,
+        )
 
         filter_start = time.time()
         self._filter_dictionary()
         logger.info("Dictionary filtering completed in %.2f seconds", time.time() - filter_start)
 
         self.fitted = True
-        logger.info("Dictionary created with %d features in %.2f seconds total (streaming)", len(self.dictionary), time.time() - start_time)
+        logger.info(
+            "Dictionary created with %d features in %.2f seconds total (streaming)",
+            len(self.dictionary),
+            time.time() - start_time,
+        )
         return self
 
     def transform(self, documents: List[List[str]]) -> sparse.csr_matrix:

@@ -46,6 +46,7 @@ def build_index(
     tokenizer: str = typer.Option('icu', help="Tokenizer plugin (e.g., icu)"),
     locale: str = typer.Option('en', help="Tokenizer locale"),
     features: str = typer.Option('bow', help="Feature extractor plugin (e.g., bow)"),
+    token_cache_path: Path | None = typer.Option(None, help="Optional JSONL(.gz) token cache to avoid double tokenization"),
     verbose: bool = typer.Option(False, "-v", help="Deprecated: use global -v"),
 ) -> None:
     tokenizer_obj = registry.tokenizers[tokenizer](locale=locale)
@@ -58,6 +59,7 @@ def build_index(
         tokenizer=tokenizer_obj,
         index_path=str(index_path),
         document_stream_factory=stream_factory,
+        token_cache_path=str(token_cache_path) if token_cache_path else None,
     )
     with open(str(index_path) + '.extractor', 'wb') as f:
         import pickle
@@ -120,6 +122,7 @@ def demo_wikipedia(
     max_eval: int = typer.Option(5000, help="Number of streaming eval articles"),
     index_prefix: Path = typer.Option(Path("indexes/wikipedia"), help="Where to save the index"),
     model_path: Path = typer.Option(Path("wikipedia_classifier.pkl"), help="Where to save the model"),
+    token_cache_path: Path | None = typer.Option(None, help="Optional JSONL(.gz) token cache to avoid double tokenization"),
     verbose: bool = typer.Option(False, "-v", help="Deprecated: use global -v"),
 ) -> None:
     logger = logging.getLogger(__name__)
@@ -151,7 +154,11 @@ def demo_wikipedia(
 
     classifier = SVMDocumentClassifier()
     logger.info("Building document index from local cached training split (no network)...")
-    classifier.build_index(index_path=str(index_prefix), document_stream_factory=train_stream_factory)
+    classifier.build_index(
+        index_path=str(index_prefix),
+        document_stream_factory=train_stream_factory,
+        token_cache_path=str(token_cache_path) if token_cache_path else None,
+    )
 
     logger.info("Training classifier...")
     classifier.train(train_labels_data)

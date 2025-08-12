@@ -42,6 +42,8 @@ class SVMDocumentClassifier:
         documents: Dict[str, str] | None = None,
         index_path: str | None = None,
         document_stream_factory: Optional[Callable[[], Iterator[Tuple[str, str]]]] = None,  # type: ignore[name-defined]
+        token_cache_path: str | None = None,
+        similarity_chunksize: int = 1024,
     ) -> "SVMDocumentClassifier":
         start_time = time.time()
         if documents is not None:
@@ -56,6 +58,8 @@ class SVMDocumentClassifier:
             tokenizer=self.tokenizer,
             index_path=index_path,
             document_stream_factory=document_stream_factory,
+            token_cache_path=token_cache_path,
+            similarity_chunksize=similarity_chunksize,
         )
         self.index_built = True
         logger.info("Document index built successfully in %.2f seconds", time.time() - start_time)
