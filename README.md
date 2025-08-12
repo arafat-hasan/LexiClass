@@ -110,6 +110,16 @@ lexiclass -v similar ./my_index DOC_ID --top-k 5 --threshold 0.0
 LEXICLASS_WIKIPEDIA_MIN_LENGTH=600 lexiclass -v demo-wikipedia --max-eval 2000
 ```
 
+- Export Wikipedia to a directory of `.txt` files + `labels.tsv` (standalone script):
+
+```bash
+python scripts/export_wikipedia.py /path/to/output \
+  --num-articles 50000 \
+  --date 20231101 --language en --min-length 500 \
+  --categories science_technology,history,geography,biography,sports,arts_culture,business_economics \
+  --offline  # use local HF cache only
+```
+
 Labels file format example:
 
 ```text

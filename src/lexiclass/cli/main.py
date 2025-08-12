@@ -9,7 +9,7 @@ from typing import Dict, Iterator, Tuple
 import typer
 
 from ..classifier import SVMDocumentClassifier
-from ..datasets.wikipedia import iter_wikipedia_dataset_local
+from ..datasets.wikipedia import iter_wikipedia_dataset, iter_wikipedia_dataset_local
 from ..features import FeatureExtractor
 from ..index import DocumentIndex
 from ..plugins import registry
