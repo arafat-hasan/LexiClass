@@ -116,7 +116,7 @@ LEXICLASS_WIKIPEDIA_MIN_LENGTH=600 lexiclass -v demo-wikipedia --max-eval 2000
 python scripts/export_wikipedia.py /path/to/output \
   --num-articles 50000 \
   --date 20231101 --language en --min-length 500 \
-  --categories science_technology,history,geography,biography,sports,arts_culture,business_economics \
+  --categories science_technology,history,geography,biography, sports,arts_culture,business_economics \
   --offline  # use local HF cache only
 ```
 
