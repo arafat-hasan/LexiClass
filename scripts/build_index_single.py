@@ -4,20 +4,35 @@ from pathlib import Path
 from gensim.utils import simple_preprocess
 from gensim.corpora import Dictionary, MmCorpus
 
+def iter_documents(path_list):
+    for file_path in path_list:
+        fp = Path(file_path).expanduser()
+        with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+            yield f.read()
+            
+def tokenized_documents_iter(path_list):
+    for doc in iter_documents(path_list):
+        yield simple_preprocess(doc)
+
+def process_full(path_list):
+    full_dictionary = Dictionary(tokenized_documents_iter(path_list))
+    full_corpus = [full_dictionary.doc2bow(tokens) for tokens in tokenized_documents_iter(path_list)]
+    return full_dictionary, full_corpus
+
 def build_index_single(file_paths):
-    tokenized_docs = [simple_preprocess(Path(fp).read_text()) for fp in file_paths]
-    dictionary = Dictionary(tokenized_docs)
-    corpus = [dictionary.doc2bow(text) for text in tokenized_docs]
-    return dictionary, corpus
-
-if __name__ == "__main__":
-    all_files = list(Path("~/data/wikipedia100k").expanduser().glob("*.txt"))
-
     start_time = time.time()
-    dictionary, corpus = build_index_single(all_files)
+
+    final_dictionary, final_corpus = process_full(file_paths)
+
     elapsed = time.time() - start_time
 
-    dictionary.save("dictionary_single.dict")
-    MmCorpus.serialize("corpus_single.mm", corpus)
+    final_dictionary.save("dictionary_single.dict")
+    MmCorpus.serialize("corpus_single.mm", final_corpus)
 
-    print(f"[Single-threaded] Processed {len(all_files)} documents in {elapsed:.2f} seconds.")
+    print(f"[Single-process] Processed {len(file_paths)} files in {elapsed:.2f} seconds.")
+    return final_dictionary, final_corpus
+
+if __name__ == "__main__":
+    data_path = Path("~/data/wikipedia50k").expanduser()
+    file_paths = list(data_path.glob("*.txt"))  # Just the paths
+    build_index_single(file_paths)
