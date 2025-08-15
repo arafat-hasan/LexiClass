@@ -7,7 +7,7 @@ from gensim.corpora import MmCorpus
 from build_index_multi import build_index_multi
 from build_index_single import build_index_single
 
-DATA_DIR = Path("~/data/wikipedia1k").expanduser()
+DATA_DIR = Path("~/data/wikipedia100k").expanduser()
     
 # Compare entire corpora while maintaining memory efficiency
 def compare_corpora():
@@ -108,10 +108,25 @@ if __name__ == "__main__":
     final_dictionary_single, final_corpus_single = benchmark(build_index_single, "Single-process", file_paths)
 
     # Compare dictionaries
-    if final_dictionary_multi == final_dictionary_single:
-        print("The two dictionaries are the same.")
+    # Compare dictionaries and their statistics
+    dicts_equal = final_dictionary_multi == final_dictionary_single
+    print("Dictionary comparison:")
+    print(f"- Vocabularies are {'identical' if dicts_equal else 'different'}")
+    
+    # Compare collection frequencies
+    cfs_diff = sum(abs(final_dictionary_multi.cfs.get(i, 0) - final_dictionary_single.cfs.get(i, 0)) 
+                   for i in set(final_dictionary_multi.cfs) | set(final_dictionary_single.cfs))
+    print(f"- Collection frequency difference: {cfs_diff}")
+    
+    # Compare document frequencies
+    dfs_diff = sum(abs(final_dictionary_multi.dfs.get(i, 0) - final_dictionary_single.dfs.get(i, 0))
+                   for i in set(final_dictionary_multi.dfs) | set(final_dictionary_single.dfs))
+    print(f"- Document frequency difference: {dfs_diff}")
+    
+    if dicts_equal and cfs_diff == 0 and dfs_diff == 0:
+        print("The dictionaries and their statistics are identical!")
     else:
-        print("The two dictionaries are different.")
+        print("There are differences in the dictionaries or their statistics.")
     
     print("\nComparing entire corpora...")
     if compare_corpora():

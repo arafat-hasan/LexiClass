@@ -17,34 +17,58 @@ def tokenized_documents_iter(path_list):
 
 
 def process_chunk(path_list, chunk_id):
+    # First pass: build dictionary
     partial_dict = Dictionary(tokenized_documents_iter(path_list))
-    partial_corpus = (partial_dict.doc2bow(tokens) for tokens in tokenized_documents_iter(path_list))
-
+    
+    # Second pass: build corpus and update frequencies
+    partial_corpus = []
+    for tokens in tokenized_documents_iter(path_list):
+        bow = partial_dict.doc2bow(tokens)
+        partial_corpus.append(bow)
+    
     dict_path = f"out/tmp/partial_dict_{chunk_id}.dict"
     corpus_path = f"out/tmp/partial_corpus_{chunk_id}.mm"
-
+    
     partial_dict.save(dict_path)
     MmCorpus.serialize(corpus_path, partial_corpus)
-
+    
     return dict_path, corpus_path
-
 def merge_results_from_disk(paths):
-    merged_dict = Dictionary.load(paths[0][0])
-    for dict_path, _ in paths[1:]:
+    merged_dict = Dictionary()
+
+    # First pass: merge vocabulary incrementally
+    for dict_path, _ in paths:
         part_dict = Dictionary.load(dict_path)
         merged_dict.merge_with(part_dict)
+
+    # Second pass: rebuild cfs/dfs and remap corpus
+    merged_dict.cfs.clear()
+    merged_dict.dfs.clear()
 
     def remapped_corpus_iter():
         for dict_path, corpus_path in paths:
             part_dict = Dictionary.load(dict_path)
-            id_map = {old_id: merged_dict.token2id[token]
-                      for token, old_id in part_dict.token2id.items()
-                      if token in merged_dict.token2id}
+            token_map = {
+                old_id: merged_dict.token2id[token]
+                for token, old_id in part_dict.token2id.items()
+                if token in merged_dict.token2id
+            }
 
             for doc in MmCorpus(corpus_path):
-                yield [(id_map[word_id], freq) for word_id, freq in doc if word_id in id_map]
+                seen_tokens = set()
+                remapped = []
+                for old_id, freq in doc:
+                    if old_id in token_map:
+                        new_id = token_map[old_id]
+                        remapped.append((new_id, freq))
+                        merged_dict.cfs[new_id] = merged_dict.cfs.get(new_id, 0) + freq
+                        if new_id not in seen_tokens:
+                            merged_dict.dfs[new_id] = merged_dict.dfs.get(new_id, 0) + 1
+                            seen_tokens.add(new_id)
+                yield remapped
 
     return merged_dict, remapped_corpus_iter()
+
 
 def build_index_multi(path_list):
     num_workers = cpu_count()
@@ -62,7 +86,7 @@ def build_index_multi(path_list):
     elapsed = time.time() - start_time
 
     final_dictionary.save("out/dictionary_multi.dict")
-    MmCorpus.serialize("out/corpus_multi.mm", final_corpus)
+    MmCorpus.serialize("out/corpus_multi.mm", final_corpus, progress_cnt=10000)
 
     print(f"[Multi-process] Processed {len(path_list)} files in {elapsed:.2f} seconds using {num_workers} workers.")
     return final_dictionary, final_corpus
