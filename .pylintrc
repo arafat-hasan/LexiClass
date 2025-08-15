@@ -1,0 +1,112 @@
+[MASTER]
+ignore=CVS
+jobs=1
+persistent=yes
+suggestion-mode=yes
+unsafe-load-any-extension=no
+load-plugins=
+
+[MESSAGES CONTROL]
+# Cleaned-up disables (legacy Py2-related rules removed)
+disable=
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+    W0511,  # FIXME/TODO/XXX
+    R0903,  # too-few-public-methods
+    R0801,  # duplicate-code
+
+enable=c-extension-no-member
+
+[REPORTS]
+output-format=colorized
+reports=no
+score=yes
+evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+
+[REFACTORING]
+max-nested-blocks=5
+never-returning-functions=sys.exit
+
+[BASIC]
+argument-naming-style=snake_case
+attr-naming-style=snake_case
+class-naming-style=PascalCase
+const-naming-style=UPPER_CASE
+function-naming-style=snake_case
+method-naming-style=snake_case
+module-naming-style=snake_case
+variable-naming-style=snake_case
+good-names=i,j,k,ex,Run,_
+bad-names=foo,bar,baz,toto,tutu,tata
+include-naming-hint=no
+no-docstring-rgx=^_
+
+[FORMAT]
+indent-string='    '
+indent-after-paren=4
+max-line-length=100
+max-module-lines=1000
+single-line-class-stmt=no
+single-line-if-stmt=no
+ignore-long-lines=^\s*(# )?<?https?://\S+>?$
+
+[LOGGING]
+logging-modules=logging
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO
+
+[SIMILARITIES]
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=no
+min-similarity-lines=4
+
+[SPELLING]
+max-spelling-suggestions=4
+spelling-store-unknown-words=no
+
+[TYPECHECK]
+contextmanager-decorators=contextlib.contextmanager
+ignore-mixin-members=yes
+ignore-on-opaque-inference=yes
+ignored-classes=optparse.Values,thread._local,_thread._local,scoped_session
+missing-member-hint=yes
+missing-member-hint-distance=1
+missing-member-max-choices=1
+
+[VARIABLES]
+allow-global-unused-variables=yes
+callbacks=cb_,_cb
+dummy-variables-rgx=_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unused_
+ignored-argument-names=_.*|^ignored_|^unused_
+init-import=no
+redefining-builtins-modules=six.moves,past.builtins,future.builtins,io,builtins
+
+[CLASSES]
+defining-attr-methods=__init__,__new__,setUp
+exclude-protected=_asdict,_fields,_replace,_source,_make
+valid-classmethod-first-arg=cls
+valid-metaclass-classmethod-first-arg=mcs
+
+[DESIGN]
+max-args=5
+max-attributes=7
+max-bool-expr=5
+max-branches=12
+max-locals=15
+max-parents=7
+max-public-methods=20
+max-returns=6
+max-statements=50
+min-public-methods=2
+
+[IMPORTS]
+allow-wildcard-with-all=no
+analyse-fallback-blocks=no
+deprecated-modules=regsub,TERMIOS,Bastion,rexec
+known-third-party=enchant
+
+[EXCEPTIONS]
+overgeneral-exceptions=Exception

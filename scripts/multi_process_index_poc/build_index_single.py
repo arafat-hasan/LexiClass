@@ -16,20 +16,20 @@ def tokenized_documents_iter(path_list):
 
 def process_full(path_list):
     full_dictionary = Dictionary(tokenized_documents_iter(path_list))
-    full_corpus = [full_dictionary.doc2bow(tokens) for tokens in tokenized_documents_iter(path_list)]
+    full_corpus = (full_dictionary.doc2bow(tokens) for tokens in tokenized_documents_iter(path_list))
     return full_dictionary, full_corpus
 
-def build_index_single(file_paths):
+def build_index_single(path_list):
     start_time = time.time()
-
-    final_dictionary, final_corpus = process_full(file_paths)
+    Path("out/tmp").mkdir(parents=True, exist_ok=True)
+    final_dictionary, final_corpus = process_full(path_list)
 
     elapsed = time.time() - start_time
 
-    final_dictionary.save("dictionary_single.dict")
-    MmCorpus.serialize("corpus_single.mm", final_corpus)
+    final_dictionary.save("out/dictionary_single.dict")
+    MmCorpus.serialize("out/corpus_single.mm", final_corpus)
 
-    print(f"[Single-process] Processed {len(file_paths)} files in {elapsed:.2f} seconds.")
+    print(f"[Single-process] Processed {len(path_list)} files in {elapsed:.2f} seconds.")
     return final_dictionary, final_corpus
 
 if __name__ == "__main__":
