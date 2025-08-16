@@ -25,6 +25,7 @@ dependencies = [
   "beautifulsoup4>=4.12",
   "typer[all]>=0.9",
   "datasets>=2.12",
+  "psutil>=5.9",
 ]
 
 [project.optional-dependencies]
