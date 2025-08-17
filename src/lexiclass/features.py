@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Iterable, List
+import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterable, List, Optional, Tuple
 
-import numpy as np
 from gensim import corpora
 from scipy import sparse
+
+from .memory_utils import calculate_batch_size, monitor_memory_usage
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +28,10 @@ class FeatureExtractor:
     Supports both in-memory and streaming dictionary construction.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, num_workers: Optional[int] = None) -> None:
         self.dictionary: corpora.Dictionary | None = None
         self.fitted: bool = False
+        self.num_workers = num_workers or max(1, mp.cpu_count() - 1)
 
     def fit(self, documents: List[List[str]]) -> "FeatureExtractor":
         start_time = time.time()
@@ -49,47 +53,121 @@ class FeatureExtractor:
         start_time = time.time()
         logger.info("Creating dictionary from streaming documents")
 
+        # Internal batching to reduce Python overhead of add_documents per doc
+        # and to keep memory usage in check for very large corpora.
+        BATCH_SIZE = 1000
+        PRUNE_AT = 2_000_000
+
         self.dictionary = corpora.Dictionary()
+        batch: list[list[str]] = []
         num_docs_seen = 0
+
         for tokens in tokenized_documents_iter:
-            self.dictionary.add_documents([tokens])
+            batch.append(tokens)
             num_docs_seen += 1
+            if len(batch) >= BATCH_SIZE:
+                self.dictionary.add_documents(batch, prune_at=PRUNE_AT)
+                batch.clear()
             if num_docs_seen % 10000 == 0:
                 logger.info("Added %d documents to dictionary so far", num_docs_seen)
 
-        logger.info("Gensim dictionary (streaming) created in %.2f seconds from %d documents", time.time() - start_time, num_docs_seen)
+        if batch:
+            self.dictionary.add_documents(batch, prune_at=PRUNE_AT)
+
+        logger.info(
+            "Gensim dictionary (streaming) created in %.2f seconds from %d documents",
+            time.time() - start_time,
+            num_docs_seen,
+        )
 
         filter_start = time.time()
         self._filter_dictionary()
         logger.info("Dictionary filtering completed in %.2f seconds", time.time() - filter_start)
 
         self.fitted = True
-        logger.info("Dictionary created with %d features in %.2f seconds total (streaming)", len(self.dictionary), time.time() - start_time)
+        logger.info(
+            "Dictionary created with %d features in %.2f seconds total (streaming)",
+            len(self.dictionary),
+            time.time() - start_time,
+        )
         return self
 
-    def transform(self, documents: List[List[str]]) -> sparse.csr_matrix:
+    def transform(
+        self,
+        documents: List[List[str]],
+        batch_size: Optional[int] = None,
+        target_memory_usage: float = 0.25,
+    ) -> sparse.csr_matrix:
+        """Transform documents to sparse matrix using parallel processing.
+        
+        Args:
+            documents: List of tokenized documents
+            batch_size: Number of documents to process in each batch
+            
+        Returns:
+            Sparse matrix of document vectors
+        """
         if not self.fitted:
             raise ValueError("FeatureExtractor must be fitted before transform")
 
         start_time = time.time()
-        logger.info("Transforming %d documents to feature vectors", len(documents))
+        logger.info("Transforming %d documents to feature vectors using %d workers", len(documents), self.num_workers)
 
+        # Process documents in parallel batches
         bow_start = time.time()
-        bow_corpus = [self.dictionary.doc2bow(doc) for doc in documents]  # type: ignore[arg-type]
-        logger.info("Bag-of-words conversion completed in %.2f seconds", time.time() - bow_start)
+        
+        def process_batch(batch: List[List[str]]) -> List[List[Tuple[int, float]]]:
+            return [self.dictionary.doc2bow(doc) for doc in batch]  # type: ignore[arg-type]
+        
+        # Calculate optimal batch size if not provided
+        if batch_size is None:
+            # Estimate average document size from first 1000 docs
+            sample_size = min(1000, len(documents))
+            avg_doc_size = sum(sum(len(token.encode('utf-8')) for token in doc) for doc in documents[:sample_size]) / sample_size
+            batch_size = calculate_batch_size(
+                num_docs=len(documents),
+                avg_doc_size=avg_doc_size,
+                target_memory_usage=target_memory_usage,
+            )
+            logger.info("Using adaptive batch size: %d", batch_size)
+            
+        # Split documents into batches
+        batches = [documents[i:i + batch_size] for i in range(0, len(documents), batch_size)]
+        
+        # Process batches in parallel with memory monitoring
+        bow_corpus: List[List[Tuple[int, float]]] = []
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            for i, batch_bows in enumerate(executor.map(process_batch, batches)):
+                bow_corpus.extend(batch_bows)
+                
+                # Monitor memory usage every 10 batches
+                if i > 0 and i % 10 == 0:
+                    monitor_memory_usage()
+                    logger.debug(
+                        "Processed %d/%d batches (%.1f%%)",
+                        i, len(batches), i * 100 / len(batches)
+                    )
+                
+        logger.info("Parallel bag-of-words conversion completed in %.2f seconds", time.time() - bow_start)
 
+        # Create sparse matrix
         sparse_start = time.time()
         num_docs = len(bow_corpus)
         num_features = len(self.dictionary)  # type: ignore[arg-type]
 
-        rows: list[int] = []
-        cols: list[int] = []
-        data: list[float] = []
+        # Pre-allocate lists with estimated size
+        estimated_nnz = sum(len(bow) for bow in bow_corpus)
+        rows = [0] * estimated_nnz
+        cols = [0] * estimated_nnz
+        data = [0.0] * estimated_nnz
+        pos = 0
+
         for doc_idx, bow in enumerate(bow_corpus):
             for token_id, count in bow:
-                rows.append(doc_idx)
-                cols.append(token_id)
-                data.append(count)
+                rows[pos] = doc_idx
+                cols[pos] = token_id
+                data[pos] = count
+                pos += 1
 
         matrix = sparse.csr_matrix((data, (rows, cols)), shape=(num_docs, num_features))
         logger.info("Sparse matrix creation completed in %.2f seconds", time.time() - sparse_start)
@@ -106,19 +184,30 @@ class FeatureExtractor:
         return self.dictionary.doc2bow(tokens)
 
     def _filter_dictionary(self) -> None:
+        """Filter dictionary using streaming approach to minimize memory usage."""
         assert self.dictionary is not None
+        
+        # First apply frequency-based filtering
         self.dictionary.filter_extremes(
             no_below=MIN_DOCS_PER_TOKEN,
             no_above=MAX_DOCS_PCT_PER_TOKEN,
             keep_n=None,
         )
 
-        garbage_tokens: list[str] = []
-        for token in self.dictionary.token2id:
+        # Stream through tokens and collect garbage IDs directly
+        # This avoids materializing two separate lists (tokens and their IDs)
+        garbage_ids = []
+        for token_id, token in self.dictionary.id2token.items():
             if self._is_garbage_token(token):
-                garbage_tokens.append(token)
-        if garbage_tokens:
-            garbage_ids = [self.dictionary.token2id[token] for token in garbage_tokens]
+                garbage_ids.append(token_id)
+                # Free memory as we go by removing from both mappings
+                # This helps when processing very large dictionaries
+                if len(garbage_ids) >= 10000:
+                    self.dictionary.filter_tokens(garbage_ids)
+                    garbage_ids = []
+        
+        # Filter any remaining garbage tokens
+        if garbage_ids:
             self.dictionary.filter_tokens(garbage_ids)
 
     def _is_garbage_token(self, token: str) -> bool:
