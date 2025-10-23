@@ -45,6 +45,11 @@ class SVMDocumentClassifier:
         token_cache_path: str | None = None,
         similarity_chunksize: int = 1024,
     ) -> "SVMDocumentClassifier":
+        # Convert to string to handle pathlib.Path objects
+        if index_path is not None:
+            index_path = str(index_path)
+        if token_cache_path is not None:
+            token_cache_path = str(token_cache_path)
         start_time = time.time()
         if documents is not None:
             logger.info("Building document index for %d documents", len(documents))
@@ -66,6 +71,8 @@ class SVMDocumentClassifier:
         return self
 
     def load_index(self, index_path: str) -> "SVMDocumentClassifier":
+        # Convert to string to handle pathlib.Path objects
+        index_path = str(index_path)
         self.document_index = DocumentIndex.load_index(index_path)
         extractor_path = index_path + '.extractor'
         if os.path.exists(extractor_path):
@@ -167,6 +174,10 @@ class SVMDocumentClassifier:
     def save_model(self, filepath: str, index_path: str | None = None) -> None:
         if not self.is_fitted:
             raise ValueError("Cannot save model that hasn't been trained")
+        # Convert to string to handle pathlib.Path objects
+        filepath = str(filepath)
+        if index_path is not None:
+            index_path = str(index_path)
         tokenizer_type = 'icu'
         tokenizer_locale = getattr(self.tokenizer, 'locale', 'en')
         model_data = {
@@ -189,6 +200,10 @@ class SVMDocumentClassifier:
 
     @classmethod
     def load_model(cls, filepath: str, index_path: str | None = None) -> "SVMDocumentClassifier":
+        # Convert to string to handle pathlib.Path objects
+        filepath = str(filepath)
+        if index_path is not None:
+            index_path = str(index_path)
         with open(filepath, 'rb') as f:
             model_data = pickle.load(f)
         tok = None

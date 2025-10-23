@@ -181,8 +181,10 @@ class DocumentIndex:
         index_start = time.time()
         logger.info("Building similarity index from streaming corpus...")
         num_features = feature_extractor.num_features()
+        # Convert index_path to string to handle pathlib.Path objects
+        prefix = str(index_path) if index_path is not None else 'temp_index'
         self.index = similarities.Similarity(
-            output_prefix=index_path or 'temp_index',
+            output_prefix=prefix,
             corpus=bow_stream,
             num_features=num_features,
             chunksize=similarity_chunksize,
@@ -203,6 +205,11 @@ class DocumentIndex:
         """Build document index from documents or stream factory."""
         # Ensure logging is configured if the library is used programmatically
         configure_logging()
+        # Convert to string to handle pathlib.Path objects
+        if index_path is not None:
+            index_path = str(index_path)
+        if token_cache_path is not None:
+            token_cache_path = str(token_cache_path)
         total_start_time = time.time()
 
         # Create document stream
@@ -235,6 +242,8 @@ class DocumentIndex:
     def save_index(self, index_path: str) -> None:
         if self.index is None:
             raise ValueError("No index to save")
+        # Convert to string to handle pathlib.Path objects
+        index_path = str(index_path)
         # Ensure the parent directory exists when using a nested prefix
         parent_dir = os.path.dirname(index_path)
         if parent_dir:
@@ -247,6 +256,8 @@ class DocumentIndex:
 
     @classmethod
     def load_index(cls, index_path: str) -> "DocumentIndex":
+        # Convert to string to handle pathlib.Path objects
+        index_path = str(index_path)
         doc_index = cls()
         doc_index.index = similarities.Similarity.load(index_path)
         doc2idx_path = index_path + '.doc2idx'
