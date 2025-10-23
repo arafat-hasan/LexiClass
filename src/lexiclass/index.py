@@ -94,7 +94,7 @@ class DocumentIndex:
                         buffer_size = 0
                 
                 with make_opener(token_cache_path) as f:
-                    for doc_id, text in make_stream:  # make_stream is already a generator
+                    for doc_id, text in make_stream():  # Call make_stream to get the generator
                         tokens = tokenizer.tokenize(text)
                         # Use more compact JSON format
                         line = json.dumps([doc_id, tokens], separators=(',', ':')) + "\n"
@@ -112,7 +112,7 @@ class DocumentIndex:
 
             feature_extractor.fit_streaming(_token_stream_and_cache())
         else:
-            feature_extractor.fit_streaming((tokenizer.tokenize(text) for _, text in make_stream))
+            feature_extractor.fit_streaming((tokenizer.tokenize(text) for _, text in make_stream()))
 
         logger.info("Dictionary built from streaming tokens in %.2f seconds", time.time() - tokenize_start)
 
@@ -162,7 +162,7 @@ class DocumentIndex:
                     idx_local += 1
                     yield bow
         else:
-            for doc_id, text in make_stream:  # make_stream is already a generator
+            for doc_id, text in make_stream():  # Call make_stream to get the generator
                 tokens = tokenizer.tokenize(text)
                 bow = feature_extractor.tokens_to_bow(tokens)
                 self.doc2idx[doc_id] = idx_local
