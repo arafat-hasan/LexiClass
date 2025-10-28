@@ -5,7 +5,7 @@
 indexes/
 models/
 data/
-
+outputs/
 
 ### CMake ###
 CMakeLists.txt.user

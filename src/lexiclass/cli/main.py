@@ -1,20 +1,14 @@
 from __future__ import annotations
-
-import json
-import logging
 import os
 from pathlib import Path
-from typing import Dict, Iterator, Tuple
-
+import random
+import numpy as np
 import typer
 
 from lexiclass.classifier import SVMDocumentClassifier
-from lexiclass.datasets.wikipedia import iter_wikipedia_dataset, iter_wikipedia_dataset_local
-from lexiclass.features import FeatureExtractor
 from lexiclass.index import DocumentIndex
 from lexiclass.plugins import registry
 from lexiclass.io import DocumentLoader, load_labels
-from lexiclass.tokenization import ICUTokenizer
 from lexiclass.config import get_settings
 from lexiclass.logging_utils import configure_logging
 from lexiclass.evaluation import (
@@ -25,9 +19,6 @@ from lexiclass.evaluation import (
     format_results_json,
     format_results_tsv,
 )
-import random
-import numpy as np
-
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="LexiClass CLI")
 
@@ -113,6 +104,9 @@ def predict(
     docs = DocumentLoader.load_documents_from_directory(str(data_dir))
     preds = classifier.predict(docs)
     if output:
+        parent_dir = os.path.dirname(output)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         with open(output, 'w', encoding='utf-8') as f:
             for doc_id, (label, score) in preds.items():
                 f.write(f"{doc_id}\t{label}\t{score:.6f}\n")
@@ -172,6 +166,9 @@ def evaluate(
 
         # Write or print output
         if output:
+            parent_dir = os.path.dirname(output)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
             with open(output, 'w', encoding='utf-8') as f:
                 f.write(output_str)
             typer.echo(f"Evaluation results written to {output}")
@@ -187,4 +184,3 @@ def evaluate(
     except Exception as e:
         typer.echo(f"Unexpected error: {e}", err=True)
         raise typer.Exit(code=1)
-
