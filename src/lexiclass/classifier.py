@@ -36,39 +36,41 @@ class SVMDocumentClassifier:
         self.is_fitted = False
         self.index_built = False
 
-    def build_index(
-        self,
-        *,
-        documents: Dict[str, str] | None = None,
-        index_path: str | None = None,
-        document_stream_factory: Optional[Callable[[], Iterator[Tuple[str, str]]]] = None,  # type: ignore[name-defined]
-        token_cache_path: str | None = None,
-        similarity_chunksize: int = 1024,
-    ) -> "SVMDocumentClassifier":
-        # Convert to string to handle pathlib.Path objects
-        if index_path is not None:
-            index_path = str(index_path)
-        if token_cache_path is not None:
-            token_cache_path = str(token_cache_path)
-        start_time = time.time()
-        if documents is not None:
-            logger.info("Building document index for %d documents", len(documents))
-        else:
-            logger.info("Building document index from streaming source")
-        if self.document_index is None:
-            self.document_index = DocumentIndex()
-        self.document_index.build_index(
-            documents=documents,
-            feature_extractor=self.feature_extractor,
-            tokenizer=self.tokenizer,
-            index_path=index_path,
-            document_stream_factory=document_stream_factory,
-            token_cache_path=token_cache_path,
-            similarity_chunksize=similarity_chunksize,
-        )
-        self.index_built = True
-        logger.info("Document index built successfully in %.2f seconds", time.time() - start_time)
-        return self
+    # def build_index(
+    #     self,
+    #     *,
+    #     documents: Dict[str, str] | None = None,
+    #     index_path: str | None = None,
+    #     document_stream_factory: Optional[Callable[[], Iterator[Tuple[str, str]]]] = None,  # type: ignore[name-defined]
+    #     token_cache_path: str | None = None,
+    #     auto_cache_tokens: bool = True,
+    #     similarity_chunksize: int = 1024,
+    # ) -> "SVMDocumentClassifier":
+    #     # Convert to string to handle pathlib.Path objects
+    #     if index_path is not None:
+    #         index_path = str(index_path)
+    #     if token_cache_path is not None:
+    #         token_cache_path = str(token_cache_path)
+    #     start_time = time.time()
+    #     if documents is not None:
+    #         logger.info("Building document index for %d documents", len(documents))
+    #     else:
+    #         logger.info("Building document index from streaming source")
+    #     if self.document_index is None:
+    #         self.document_index = DocumentIndex()
+    #     self.document_index.build_index(
+    #         documents=documents,
+    #         feature_extractor=self.feature_extractor,
+    #         tokenizer=self.tokenizer,
+    #         index_path=index_path,
+    #         document_stream_factory=document_stream_factory,
+    #         token_cache_path=token_cache_path,
+    #         auto_cache_tokens=auto_cache_tokens,
+    #         similarity_chunksize=similarity_chunksize,
+    #     )
+    #     self.index_built = True
+    #     logger.info("Document index built successfully in %.2f seconds", time.time() - start_time)
+    #     return self
 
     def load_index(self, index_path: str) -> "SVMDocumentClassifier":
         # Convert to string to handle pathlib.Path objects
@@ -176,6 +178,9 @@ class SVMDocumentClassifier:
             raise ValueError("Cannot save model that hasn't been trained")
         # Convert to string to handle pathlib.Path objects
         filepath = str(filepath)
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         if index_path is not None:
             index_path = str(index_path)
         tokenizer_type = 'icu'

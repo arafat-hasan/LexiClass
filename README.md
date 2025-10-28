@@ -103,7 +103,23 @@ lexiclass -v predict ./model.pkl ./my_index /path/to/texts --output preds.tsv
 ```bash
 lexiclass -v similar ./my_index DOC_ID --top-k 5 --threshold 0.0
 ```
-
+- Evaluation
+  - Basic evaluation
+    ```
+    lexiclass evaluate preds.tsv ~/data/agnews/test/labels.tsv
+    ```
+  - With confusion matrix
+    ```
+    lexiclass evaluate preds.tsv ~/data/agnews/test/labels.tsv --confusion-matrix
+    ```
+    - JSON output for scripts
+    ```
+    lexiclass evaluate preds.tsv ~/data/agnews/test/labels.tsv --format json --output metrics.json
+    ```
+    - TSV for spreadsheets
+    ```
+    lexiclass evaluate preds.tsv ~/data/agnews/test/labels.tsv --format tsv --output metrics.tsv
+    ```
 - Run the Wikipedia demo (streams from Hugging Face; requires `datasets`):
 
 ```bash

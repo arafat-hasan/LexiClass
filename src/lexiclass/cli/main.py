@@ -17,6 +17,14 @@ from lexiclass.io import DocumentLoader, load_labels
 from lexiclass.tokenization import ICUTokenizer
 from lexiclass.config import get_settings
 from lexiclass.logging_utils import configure_logging
+from lexiclass.evaluation import (
+    load_predictions,
+    load_ground_truth,
+    evaluate_predictions,
+    format_results_text,
+    format_results_json,
+    format_results_tsv,
+)
 import random
 import numpy as np
 
@@ -47,17 +55,30 @@ def build_index(
     locale: str = typer.Option('en', help="Tokenizer locale"),
     features: str = typer.Option('bow', help="Feature extractor plugin (e.g., bow)"),
     token_cache_path: Path | None = typer.Option(None, help="Optional JSONL(.gz) token cache to avoid double tokenization"),
+    auto_cache_tokens: bool = typer.Option(True, help="Automatically cache tokens to avoid re-tokenization"),
 ) -> None:
+    """Build a document similarity index from a directory of .txt files.
+
+    By default, tokens are automatically cached to {index_path}.tokens.jsonl.gz
+    to avoid tokenizing documents twice (once for dictionary, once for indexing).
+    Set --no-auto-cache-tokens to disable this behavior.
+    """
     tokenizer_obj = registry.tokenizers[tokenizer](locale=locale)
     feature_extractor = registry.features[features]()
     index = DocumentIndex()
-    
+
+    # Create a proper factory function instead of passing a generator
+    data_dir_str = str(data_dir)
+    def document_stream_factory():
+        return DocumentLoader.iter_documents_from_directory(data_dir_str)
+
     index.build_index(
         feature_extractor=feature_extractor,
         tokenizer=tokenizer_obj,
         index_path=str(index_path),
-        document_stream_factory=DocumentLoader.iter_documents_from_directory(str(data_dir)),
+        document_stream_factory=document_stream_factory,
         token_cache_path=str(token_cache_path) if token_cache_path else None,
+        auto_cache_tokens=auto_cache_tokens,
     )
     with open(str(index_path) + '.extractor', 'wb') as f:
         import pickle
@@ -113,4 +134,57 @@ def similar(
     results = index.query_by_id(doc_id, threshold=threshold)[:top_k]
     for rid, score in results:
         typer.echo(f"{rid}\t{score:.4f}")
+
+
+@app.command()
+def evaluate(
+    predictions_file: Path = typer.Argument(..., exists=True, help="TSV file with predictions (doc_id<TAB>label<TAB>score)"),
+    ground_truth_file: Path = typer.Argument(..., exists=True, help="TSV file with ground truth labels (doc_id<TAB>label)"),
+    output: Path | None = typer.Option(None, help="Optional output file for results"),
+    format: str = typer.Option("text", help="Output format: text, json, or tsv"),
+    confusion_matrix: bool = typer.Option(False, "--confusion-matrix", help="Show confusion matrix in output"),
+) -> None:
+    """Evaluate predictions against ground truth labels.
+
+    Calculate precision, recall, F1-score, and accuracy by comparing
+    predictions with ground truth labels. Supports multiple output formats.
+
+    Example:
+        lexiclass evaluate preds.tsv labels.tsv
+        lexiclass evaluate preds.tsv labels.tsv --output results.txt
+        lexiclass evaluate preds.tsv labels.tsv --format json --output metrics.json
+    """
+    try:
+        # Load data
+        predictions = load_predictions(predictions_file)
+        ground_truth = load_ground_truth(ground_truth_file)
+
+        # Calculate metrics
+        metrics = evaluate_predictions(predictions, ground_truth)
+
+        # Format output
+        if format == "json":
+            output_str = format_results_json(metrics)
+        elif format == "tsv":
+            output_str = format_results_tsv(metrics)
+        else:  # text (default)
+            output_str = format_results_text(metrics, show_confusion_matrix=confusion_matrix)
+
+        # Write or print output
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write(output_str)
+            typer.echo(f"Evaluation results written to {output}")
+        else:
+            typer.echo(output_str)
+
+    except FileNotFoundError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.echo(f"Unexpected error: {e}", err=True)
+        raise typer.Exit(code=1)
 

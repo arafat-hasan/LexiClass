@@ -6,6 +6,7 @@ import time
 import os
 import json
 import gzip
+from pathlib import Path
 from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
 from gensim import similarities
@@ -39,7 +40,10 @@ class DocumentIndex:
         documents: Dict[str, str] | None = None,
         document_stream_factory: Optional[Callable[[], Iterator[Tuple[str, str]]]] = None,
     ) -> Callable[[], Iterator[Tuple[str, str]]]:
-        """Create a document stream factory from either documents dict or stream factory."""
+        """Create a document stream factory from either documents dict or stream factory.
+
+        Ensures that the result is always a callable factory, not a generator instance.
+        """
         if documents is not None:
             logger.info("Building document index (in-memory documents: %d)", len(documents))
             def _make_stream() -> Iterator[Tuple[str, str]]:
@@ -48,127 +52,166 @@ class DocumentIndex:
             return _make_stream
         elif document_stream_factory is not None:
             logger.info("Building document index from streaming source")
+            # Ensure document_stream_factory is callable, not already a generator
+            if not callable(document_stream_factory):
+                raise TypeError("document_stream_factory must be a callable that returns an iterator, not an iterator itself")
             return document_stream_factory
-        else:
-            raise ValueError("Either 'documents' or 'document_stream_factory' must be provided")
+
+        raise ValueError("Either 'documents' or 'document_stream_factory' must be provided")
+
+    def _get_token_cache_path(self, index_path: Optional[str], auto_cache: bool) -> Optional[str]:
+        """Generate token cache path if auto_cache is enabled and index_path is provided."""
+        if auto_cache and index_path:
+            return f"{index_path}.tokens.jsonl.gz"
+        return None
+
+    def _save_tokens_and_build_dict(
+        self,
+        make_stream: Callable[[], Iterator[Tuple[str, str]]],
+        tokenizer: TokenizerProtocol,
+        feature_extractor: FeatureExtractorProtocol,
+        token_cache_path: str,
+    ) -> None:
+        """Tokenize documents, save to cache, and build dictionary."""
+        tokenize_start = time.time()
+        logger.info("Tokenizing documents and caching to %s...", token_cache_path)
+
+        parent_dir = os.path.dirname(token_cache_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        def _token_stream_and_cache() -> Iterator[List[str]]:
+            """Stream and cache tokens with efficient compression."""
+            def make_opener(path: str):
+                if path.endswith('.gz'):
+                    return gzip.open(path, 'wt', encoding='utf-8', compresslevel=9)
+                return open(path, 'wt', encoding='utf-8')
+
+            buffer = []
+            buffer_size = 0
+            max_buffer_size = 10 * 1024 * 1024  # 10MB buffer
+
+            def flush_buffer(f):
+                if buffer:
+                    f.write(''.join(buffer))
+                    buffer.clear()
+                    nonlocal buffer_size
+                    buffer_size = 0
+
+            with make_opener(token_cache_path) as f:
+                for doc_id, text in make_stream():
+                    tokens = tokenizer.tokenize(text)
+                    line = json.dumps([doc_id, tokens], separators=(',', ':')) + "\n"
+                    buffer.append(line)
+                    buffer_size += len(line.encode('utf-8'))
+
+                    if buffer_size >= max_buffer_size:
+                        flush_buffer(f)
+
+                    yield tokens
+
+                flush_buffer(f)
+
+        feature_extractor.fit_streaming(_token_stream_and_cache())
+        logger.info("Tokens cached and dictionary built in %.2f seconds", time.time() - tokenize_start)
+
+    def _build_dict_from_stream(
+        self,
+        make_stream: Callable[[], Iterator[Tuple[str, str]]],
+        tokenizer: TokenizerProtocol,
+        feature_extractor: FeatureExtractorProtocol,
+    ) -> None:
+        """Build dictionary directly from document stream without caching."""
+        tokenize_start = time.time()
+        logger.info("Tokenizing documents to build dictionary...")
+        feature_extractor.fit_streaming((tokenizer.tokenize(text) for _, text in make_stream()))
+        logger.info("Dictionary built in %.2f seconds", time.time() - tokenize_start)
 
     def _process_tokens_and_extract_features(
         self,
         make_stream: Callable[[], Iterator[Tuple[str, str]]],
         tokenizer: TokenizerProtocol,
         feature_extractor: FeatureExtractorProtocol,
-        token_cache_path: Optional[str] = None,
+        token_cache_path: Optional[str],
     ) -> None:
-        """Process tokens and extract features, optionally using token cache."""
-        tokenize_start = time.time()
-        logger.info("Tokenizing documents (pass 1) to build dictionary%s...",
-                    " with token cache" if token_cache_path else "")
-
+        """Process tokens and extract features, with optional token caching."""
         if token_cache_path:
-            parent_dir = os.path.dirname(token_cache_path)
-            if parent_dir:
-                os.makedirs(parent_dir, exist_ok=True)
-
-            def _token_stream_and_cache() -> Iterator[List[str]]:
-                """Stream and cache tokens with efficient compression.
-                
-                Uses a higher compression level for gzip and batched writes to improve
-                compression ratio and reduce I/O overhead.
-                """
-                # Use higher compression level (9) for better compression
-                def make_opener(path: str):
-                    if path.endswith('.gz'):
-                        return gzip.open(path, 'wt', encoding='utf-8', compresslevel=9)
-                    return open(path, 'wt', encoding='utf-8')
-                
-                # Buffer for batched writes
-                buffer = []
-                buffer_size = 0
-                max_buffer_size = 10 * 1024 * 1024  # 10MB buffer
-                
-                def flush_buffer(f):
-                    if buffer:
-                        f.write(''.join(buffer))
-                        buffer.clear()
-                        nonlocal buffer_size
-                        buffer_size = 0
-                
-                with make_opener(token_cache_path) as f:
-                    for doc_id, text in make_stream():  # Call make_stream to get the generator
-                        tokens = tokenizer.tokenize(text)
-                        # Use more compact JSON format
-                        line = json.dumps([doc_id, tokens], separators=(',', ':')) + "\n"
-                        buffer.append(line)
-                        buffer_size += len(line.encode('utf-8'))
-                        
-                        # Flush buffer if it gets too large
-                        if buffer_size >= max_buffer_size:
-                            flush_buffer(f)
-                            
-                        yield tokens
-                    
-                    # Flush any remaining entries
-                    flush_buffer(f)
-
-            feature_extractor.fit_streaming(_token_stream_and_cache())
+            self._save_tokens_and_build_dict(make_stream, tokenizer, feature_extractor, token_cache_path)
         else:
-            feature_extractor.fit_streaming((tokenizer.tokenize(text) for _, text in make_stream()))
+            self._build_dict_from_stream(make_stream, tokenizer, feature_extractor)
 
-        logger.info("Dictionary built from streaming tokens in %.2f seconds", time.time() - tokenize_start)
+    def _create_bow_stream_from_cache(
+        self,
+        token_cache_path: str,
+        feature_extractor: FeatureExtractorProtocol,
+    ) -> Iterator[List[Tuple[int, float]]]:
+        """Create BOW stream from cached tokens."""
+        logger.info("Creating BOW stream from token cache...")
+        self.doc2idx = {}
+        self.idx2doc = []
+        idx_local = 0
+
+        def make_opener(path: str):
+            if path.endswith('.gz'):
+                return gzip.open(path, 'rt', encoding='utf-8')
+            return open(path, 'rt', encoding='utf-8')
+
+        with make_opener(token_cache_path) as f:
+            batch = []
+            batch_size = 1000
+
+            for line in f:
+                doc_id, tokens = json.loads(line)
+                batch.append((doc_id, tokens))
+
+                if len(batch) >= batch_size:
+                    for b_doc_id, b_tokens in batch:
+                        bow = feature_extractor.tokens_to_bow(b_tokens)
+                        self.doc2idx[b_doc_id] = idx_local
+                        self.idx2doc.append(b_doc_id)
+                        idx_local += 1
+                        yield bow
+                    batch = []
+
+            for b_doc_id, b_tokens in batch:
+                bow = feature_extractor.tokens_to_bow(b_tokens)
+                self.doc2idx[b_doc_id] = idx_local
+                self.idx2doc.append(b_doc_id)
+                idx_local += 1
+                yield bow
+
+    def _create_bow_stream_from_documents(
+        self,
+        make_stream: Callable[[], Iterator[Tuple[str, str]]],
+        tokenizer: TokenizerProtocol,
+        feature_extractor: FeatureExtractorProtocol,
+    ) -> Iterator[List[Tuple[int, float]]]:
+        """Create BOW stream by tokenizing documents on the fly."""
+        logger.info("Creating BOW stream from documents (re-tokenizing)...")
+        self.doc2idx = {}
+        self.idx2doc = []
+        idx_local = 0
+
+        for doc_id, text in make_stream():
+            tokens = tokenizer.tokenize(text)
+            bow = feature_extractor.tokens_to_bow(tokens)
+            self.doc2idx[doc_id] = idx_local
+            self.idx2doc.append(doc_id)
+            idx_local += 1
+            yield bow
 
     def _create_bow_stream(
         self,
         make_stream: Callable[[], Iterator[Tuple[str, str]]],
         tokenizer: TokenizerProtocol,
         feature_extractor: FeatureExtractorProtocol,
-        token_cache_path: Optional[str] = None,
+        token_cache_path: Optional[str],
     ) -> Iterator[List[Tuple[int, float]]]:
-        """Create BOW stream from documents, handling token cache if provided."""
-        self.doc2idx = {}
-        self.idx2doc = []
-        idx_local = 0
-
-        if token_cache_path:
-            # Use buffered reading for better performance
-            def make_opener(path: str):
-                if path.endswith('.gz'):
-                    return gzip.open(path, 'rt', encoding='utf-8')
-                return open(path, 'rt', encoding='utf-8')
-            
-            with make_opener(token_cache_path) as f:
-                # Process tokens in batches to reduce Python overhead
-                batch = []
-                batch_size = 1000  # Process 1000 documents at a time
-                
-                for line in f:
-                    doc_id, tokens = json.loads(line)
-                    batch.append((doc_id, tokens))
-                    
-                    if len(batch) >= batch_size:
-                        # Process batch
-                        for b_doc_id, b_tokens in batch:
-                            bow = feature_extractor.tokens_to_bow(b_tokens)
-                            self.doc2idx[b_doc_id] = idx_local
-                            self.idx2doc.append(b_doc_id)
-                            idx_local += 1
-                            yield bow
-                        batch = []
-                
-                # Process remaining documents
-                for b_doc_id, b_tokens in batch:
-                    bow = feature_extractor.tokens_to_bow(b_tokens)
-                    self.doc2idx[b_doc_id] = idx_local
-                    self.idx2doc.append(b_doc_id)
-                    idx_local += 1
-                    yield bow
+        """Create BOW stream from documents, using token cache if available."""
+        if token_cache_path and os.path.exists(token_cache_path):
+            return self._create_bow_stream_from_cache(token_cache_path, feature_extractor)
         else:
-            for doc_id, text in make_stream():  # Call make_stream to get the generator
-                tokens = tokenizer.tokenize(text)
-                bow = feature_extractor.tokens_to_bow(tokens)
-                self.doc2idx[doc_id] = idx_local
-                self.idx2doc.append(doc_id)
-                idx_local += 1
-                yield bow
+            return self._create_bow_stream_from_documents(make_stream, tokenizer, feature_extractor)
 
     def _build_similarity_index(
         self,
@@ -200,29 +243,55 @@ class DocumentIndex:
         index_path: str | None = None,
         document_stream_factory: Optional[Callable[[], Iterator[Tuple[str, str]]]] = None,
         token_cache_path: Optional[str] = None,
+        auto_cache_tokens: bool = False,
         similarity_chunksize: int = 1024,
     ) -> "DocumentIndex":
-        """Build document index from documents or stream factory."""
+        """Build document index from documents or stream factory.
+
+        Args:
+            documents: Dictionary of doc_id -> text (for in-memory corpora)
+            feature_extractor: Feature extractor to build dictionary and transform documents
+            tokenizer: Tokenizer to convert text to tokens
+            index_path: Path prefix for saving index artifacts
+            document_stream_factory: Factory function that returns an iterator of (doc_id, text) tuples
+            token_cache_path: Explicit path to save/load tokenized documents
+            auto_cache_tokens: If True and index_path is provided, automatically cache tokens
+                              to {index_path}.tokens.jsonl.gz to avoid re-tokenization
+            similarity_chunksize: Chunk size for Gensim Similarity index
+
+        Returns:
+            Self for method chaining
+
+        Note:
+            - If token_cache_path is provided, it takes precedence over auto_cache_tokens
+            - Token caching avoids tokenizing documents twice (once for dict building, once for indexing)
+            - For library use, set auto_cache_tokens=True for better performance on large corpora
+        """
         # Ensure logging is configured if the library is used programmatically
         configure_logging()
+
         # Convert to string to handle pathlib.Path objects
         if index_path is not None:
             index_path = str(index_path)
         if token_cache_path is not None:
             token_cache_path = str(token_cache_path)
+
+        # Determine effective token cache path
+        effective_cache_path = token_cache_path or self._get_token_cache_path(index_path, auto_cache_tokens)
+
         total_start_time = time.time()
 
-        # Create document stream
+        # Create document stream factory
         make_stream = self._create_document_stream(documents, document_stream_factory)
 
-        # Process tokens and extract features
+        # Phase 1: Tokenize and build dictionary (with optional caching)
         self._process_tokens_and_extract_features(
-            make_stream, tokenizer, feature_extractor, token_cache_path
+            make_stream, tokenizer, feature_extractor, effective_cache_path
         )
 
-        # Create BOW stream and build similarity index
+        # Phase 2: Create BOW stream and build similarity index
         bow_stream = self._create_bow_stream(
-            make_stream, tokenizer, feature_extractor, token_cache_path
+            make_stream, tokenizer, feature_extractor, effective_cache_path
         )
         self._build_similarity_index(
             bow_stream, feature_extractor, index_path, similarity_chunksize

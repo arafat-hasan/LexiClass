@@ -3,6 +3,8 @@
 *.doc2idx
 *.extractor
 indexes/
+models/
+data/
 
 
 ### CMake ###

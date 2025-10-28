@@ -186,11 +186,33 @@ class FeatureExtractor:
     def _filter_dictionary(self) -> None:
         """Filter dictionary using streaming approach to minimize memory usage."""
         assert self.dictionary is not None
-        
+
+        # Determine adaptive filtering parameters based on corpus size
+        num_docs = self.dictionary.num_docs
+
+        # For small corpora, use more lenient filtering
+        if num_docs < 10:
+            # Very small corpus: only filter tokens that appear in exactly 1 document
+            min_docs = 2
+            max_docs_pct = 1.0  # Allow tokens in all documents
+        elif num_docs < 50:
+            # Small corpus: require at least 2 docs, allow up to 80%
+            min_docs = 2
+            max_docs_pct = 0.8
+        else:
+            # Normal corpus: use standard filtering
+            min_docs = MIN_DOCS_PER_TOKEN
+            max_docs_pct = MAX_DOCS_PCT_PER_TOKEN
+
+        logger.info(
+            "Applying dictionary filtering: min_docs=%d, max_docs_pct=%.2f (corpus size: %d documents)",
+            min_docs, max_docs_pct, num_docs
+        )
+
         # First apply frequency-based filtering
         self.dictionary.filter_extremes(
-            no_below=MIN_DOCS_PER_TOKEN,
-            no_above=MAX_DOCS_PCT_PER_TOKEN,
+            no_below=min_docs,
+            no_above=max_docs_pct,
             keep_n=None,
         )
 
