@@ -120,6 +120,8 @@ python scripts/export_wikipedia.py /path/to/output \
   --offline  # use local HF cache only
 ```
 
+**Note**: If you encounter PyArrow threading errors during export (like `PyGILState_Release` errors), this is a known issue with the Hugging Face datasets library. The script has been updated with proper cleanup to minimize these issues.
+
 Labels file format example:
 
 ```text
@@ -205,7 +207,6 @@ This makes it easy to add new implementations without modifying the core code.
 - `lexiclass.io.DocumentLoader`: disk IO; `load_labels` parses TSV labels
 - `lexiclass.plugins`: simple registry for plugins
 - `lexiclass.interfaces`: Protocols for pluggable components
-
 ## Tips and troubleshooting
 
 - If `pip install -e .` fails due to older build tools, upgrade:

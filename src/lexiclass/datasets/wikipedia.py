@@ -199,6 +199,7 @@ def iter_wikipedia_dataset_local(
       without loading all documents in memory.
     - Uses memory-mapped Arrow dataset (non-streaming) for stable, resource-safe iteration.
     """
+    dataset = None
     try:
         from datasets import load_dataset, DownloadConfig
 
@@ -250,5 +251,11 @@ def iter_wikipedia_dataset_local(
     except Exception as e:  # noqa: BLE001
         logger.error("Error iterating local Wikipedia dataset: %s", e)
         return
+    finally:
+        # Clean up dataset reference to help PyArrow cleanup properly
+        if dataset is not None:
+            del dataset
+        import gc
+        gc.collect()
 
 

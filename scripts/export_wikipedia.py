@@ -180,17 +180,26 @@ def main() -> None:
     if args.offline:
         os.environ["HF_DATASETS_OFFLINE"] = "1"
 
-    export_wikipedia_corpus(
-        output_directory=args.out_dir,
-        num_articles=args.num_articles,
-        date=args.date,
-        language=args.language,
-        min_length=args.min_length,
-        categories=args.categories,
-        offline=args.offline,
-        cache_dir=args.cache_dir,
-        skip_first=args.skip_first,
-    )
+    try:
+        export_wikipedia_corpus(
+            output_directory=args.out_dir,
+            num_articles=args.num_articles,
+            date=args.date,
+            language=args.language,
+            min_length=args.min_length,
+            categories=args.categories,
+            offline=args.offline,
+            cache_dir=args.cache_dir,
+            skip_first=args.skip_first,
+        )
+    finally:
+        # Force garbage collection and cleanup before exit to prevent PyArrow threading issues
+        import gc
+        gc.collect()
+        
+        # Give PyArrow threads time to clean up
+        import time
+        time.sleep(0.1)
 
 
 if __name__ == "__main__":
