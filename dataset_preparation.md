@@ -143,15 +143,6 @@ If a dataset does not contain labels (like Wikipedia), all records are placed in
 * Compatible with both **offline** (cached) and **online** modes.
 * Exports human-readable logs with timestamps and progress indicators.
 
----
-
-## Common Issues
-
-| Problem                                                       | Possible Cause                                 | Fix                                                                        |
-| ------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| `ValueError: BuilderConfig ... doesn't have a 'offline' key.` | Old-style dataset script (e.g. `wikipedia.py`) | Use canonical dataset names from Hugging Face Hub (`wikimedia/wikipedia`). |
-| `Export complete. Total written: 0`                           | Filters excluded all records                   | Check your `--categories` or `--min-length` filter.                        |
-| Process aborted (SIGABRT)                                     | Large dataset + memory exhaustion              | Use fewer records (`--num-records 10000`) or enable streaming.             |
 
 ---
 

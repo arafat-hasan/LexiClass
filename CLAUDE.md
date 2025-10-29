@@ -1,6 +1,4 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Lexiclass
 
 ## Project Overview
 
@@ -82,23 +80,10 @@ lexiclass evaluate preds.tsv ground_truth_labels.tsv --format tsv --output metri
 lexiclass similar ./my_index DOC_ID --top-k 5 --threshold 0.0
 ```
 
-### Wikipedia demo
-
-```bash
-# Streams from Hugging Face, trains and evaluates
-LEXICLASS_WIKIPEDIA_MIN_LENGTH=600 lexiclass demo-wikipedia --max-eval 2000
-```
 
 ### Exporting datasets
 
 ```bash
-# Export Wikipedia to directory structure
-python scripts/export_wikipedia.py /path/to/output \
-  --num-articles 50000 \
-  --date 20231101 --language en --min-length 500 \
-  --categories science_technology,history,geography,biography,sports,arts_culture,business_economics \
-  --offline  # use local HF cache only
-
 # Generic dataset downloader (AG News, IMDB, etc.)
 python scripts/download_dataset.py ~/data/agnews \
   --dataset ag_news \
@@ -175,9 +160,6 @@ This avoids loading entire corpus into memory. Token cache prevents redundant to
 
 Encoder automatically selected based on label structure during `train()`.
 
-#### Path Handling
-
-All path parameters (index_path, token_cache_path, filepath) are converted to strings via `str()` to handle both string and `pathlib.Path` objects (see `classifier.py:49-52`, `73-75`).
 
 ### Configuration System
 
@@ -210,25 +192,18 @@ src/lexiclass/
 ├── config.py              # Environment-based settings
 ├── logging_utils.py       # Centralized logging configuration
 ├── memory_utils.py        # Memory monitoring and adaptive batching
-├── cli/
-│   └── main.py            # Typer-based CLI commands
-└── datasets/
-    ├── __init__.py
-    └── wikipedia.py       # Streaming Wikipedia helpers (HF datasets)
+└── cli/
+    └── main.py            # Typer-based CLI commands
+
 ```
 
 ### Dataset Scripts
 
 Two standalone scripts in `scripts/`:
 
-- `export_wikipedia.py`: Exports Wikipedia articles to `.txt` files + `labels.tsv` with category-based categorization
 - `download_dataset.py`: Generic HF datasets downloader (AG News, IMDB, DBpedia, etc.) to directory structure + `metadata.csv`
 
 Both use streaming mode to handle large datasets efficiently. See `dataset_preparation.md` for details.
-
-### Known Issues
-
-- PyArrow threading errors may occur during HF dataset export (`PyGILState_Release` errors). The scripts have cleanup to minimize this, but it's a known HF datasets library issue.
 
 ## Evaluation Metrics
 

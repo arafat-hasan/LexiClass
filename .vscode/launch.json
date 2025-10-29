@@ -4,12 +4,93 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
-            "name": "Python Debugger: Current File",
+            "name": "Build Index (AG News)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "module": "lexiclass",
+            "args": [
+                "-v",
+                "build-index",
+                "${env:HOME}/data/agnews/train/texts",
+                "./indexes/agnews",
+                "--tokenizer", "icu",
+                "--locale", "en",
+                "--features", "bow",
+                // "--no-auto-cache-tokens"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train (AG News)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lexiclass",
+            "args": [
+                "-v",
+                "train",
+                "./indexes/agnews",
+                "${env:HOME}/data/agnews/train/labels.tsv",
+                "./models/agnews.pkl"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Predict (AG News)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lexiclass",
+            "args": [
+                "-v",
+                "predict",
+                "./models/agnews.pkl",
+                "./indexes/agnews",
+                "${env:HOME}/data/agnews/test/texts",
+                "--output", "./outputs/agnews_predictions.tsv"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Evaluate (AG News)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lexiclass",
+            "args": [
+                "evaluate",
+                "./outputs/agnews_predictions.tsv",
+                "${env:HOME}/data/agnews/test/labels.tsv",
+                "--confusion-matrix",
+                "--output", "./outputs/evaluation.txt"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Evaluate: JSON output (AG News)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lexiclass",
+            "args": [
+                "evaluate",
+                "./outputs/agnews_predictions.tsv",
+                "${env:HOME}/data/agnews/test/labels.tsv",
+                "--format", "json",
+                "--output", "./outputs/metrics.json"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Similar (Similarity Search)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lexiclass",
+            "args": [
+                "similar",
+                "./indexes/agnews",
+                "00000001",
+                "--top-k", "10",
+                "--threshold", "0.0"
+            ],
             "console": "integratedTerminal"
         }
     ]
