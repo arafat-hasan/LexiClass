@@ -9,7 +9,6 @@ Extensible document classification toolkit (SVM-based) with document similarity 
 - Indexing: Two-pass, memory-friendly similarity index (Gensim Similarity)
 - Classification: Linear SVM (binary, multi-class, multi-label via OvR)
 - CLI: Typer CLI for building index, training, predicting, similarity search
-- Datasets: Optional, streaming Wikipedia loader (Hugging Face `datasets`)
 - Extensibility: Protocol interfaces and a simple plugin registry
 
 ## Prepare a development environment
@@ -57,9 +56,6 @@ LexiClass reads configuration from environment variables (optionally from a `.en
 - `LEXICLASS_SKLEARN_LOG_LEVEL` (default: `WARNING`)
 - `LEXICLASS_RANDOM_SEED` (default: `42`)
 - `LEXICLASS_LOCALE` (default: `en`)
-- `LEXICLASS_WIKIPEDIA_DATE` (default: `20231101`)
-- `LEXICLASS_WIKIPEDIA_LANG` (default: `en`)
-- `LEXICLASS_WIKIPEDIA_MIN_LENGTH` (default: `500`)
 
 Example `.env` file:
 
@@ -120,35 +116,6 @@ lexiclass -v similar ./my_index DOC_ID --top-k 5 --threshold 0.0
     ```
     lexiclass evaluate preds.tsv ~/data/agnews/test/labels.tsv --format tsv --output metrics.tsv
     ```
-- Run the Wikipedia demo (streams from Hugging Face; requires `datasets`):
-
-```bash
-LEXICLASS_WIKIPEDIA_MIN_LENGTH=600 lexiclass -v demo-wikipedia --max-eval 2000
-```
-
-- Export Wikipedia to a directory of `.txt` files + `labels.tsv` (standalone script):
-
-```bash
-python scripts/export_wikipedia.py /path/to/output \
-  --num-articles 50000 \
-  --date 20231101 --language en --min-length 500 \
-  --categories science_technology,history,geography,biography,sports,arts_culture,business_economics \
-  --offline  # use local HF cache only
-```
-
-**Note**: If you encounter PyArrow threading errors during export (like `PyGILState_Release` errors), this is a known issue with the Hugging Face datasets library. The script has been updated with proper cleanup to minimize these issues.
-
-Labels file format example:
-
-```text
-doc123<TAB>science_technology
-doc456<TAB>history
-```
-
-Notes:
-
-- Index artifacts: `my_index`, `my_index.doc2idx`, and `my_index.extractor` are produced.
-- `demo-wikipedia` builds a streaming index from Wikipedia (subset categories), trains on a split of streamed items, evaluates, and saves the model.
 
 ## Using as a library in your Python project
 
@@ -219,7 +186,6 @@ This makes it easy to add new implementations without modifying the core code.
 - `lexiclass.features.FeatureExtractor`: Gensim dictionary + sparse features
 - `lexiclass.index.DocumentIndex`: streaming two-pass Similarity index
 - `lexiclass.classifier.SVMDocumentClassifier`: training, prediction, similarity
-- `lexiclass.datasets.wikipedia`: optional streaming dataset helpers
 - `lexiclass.io.DocumentLoader`: disk IO; `load_labels` parses TSV labels
 - `lexiclass.plugins`: simple registry for plugins
 - `lexiclass.interfaces`: Protocols for pluggable components
