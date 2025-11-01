@@ -1,3 +1,5 @@
+"""Bag-of-Words feature extractor plugin."""
+
 from __future__ import annotations
 
 import logging
@@ -9,7 +11,7 @@ from typing import Iterable, List, Optional, Tuple
 from gensim import corpora
 from scipy import sparse
 
-from .memory_utils import calculate_batch_size, monitor_memory_usage
+from ...memory_utils import calculate_batch_size, monitor_memory_usage
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +101,11 @@ class FeatureExtractor:
         target_memory_usage: float = 0.25,
     ) -> sparse.csr_matrix:
         """Transform documents to sparse matrix using parallel processing.
-        
+
         Args:
             documents: List of tokenized documents
             batch_size: Number of documents to process in each batch
-            
+
         Returns:
             Sparse matrix of document vectors
         """
@@ -115,10 +117,10 @@ class FeatureExtractor:
 
         # Process documents in parallel batches
         bow_start = time.time()
-        
+
         def process_batch(batch: List[List[str]]) -> List[List[Tuple[int, float]]]:
             return [self.dictionary.doc2bow(doc) for doc in batch]  # type: ignore[arg-type]
-        
+
         # Calculate optimal batch size if not provided
         if batch_size is None:
             # Estimate average document size from first 1000 docs
@@ -130,16 +132,16 @@ class FeatureExtractor:
                 target_memory_usage=target_memory_usage,
             )
             logger.info("Using adaptive batch size: %d", batch_size)
-            
+
         # Split documents into batches
         batches = [documents[i:i + batch_size] for i in range(0, len(documents), batch_size)]
-        
+
         # Process batches in parallel with memory monitoring
         bow_corpus: List[List[Tuple[int, float]]] = []
         with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
             for i, batch_bows in enumerate(executor.map(process_batch, batches)):
                 bow_corpus.extend(batch_bows)
-                
+
                 # Monitor memory usage every 10 batches
                 if i > 0 and i % 10 == 0:
                     monitor_memory_usage()
@@ -147,7 +149,7 @@ class FeatureExtractor:
                         "Processed %d/%d batches (%.1f%%)",
                         i, len(batches), i * 100 / len(batches)
                     )
-                
+
         logger.info("Parallel bag-of-words conversion completed in %.2f seconds", time.time() - bow_start)
 
         # Create sparse matrix
@@ -227,7 +229,7 @@ class FeatureExtractor:
                 if len(garbage_ids) >= 10000:
                     self.dictionary.filter_tokens(garbage_ids)
                     garbage_ids = []
-        
+
         # Filter any remaining garbage tokens
         if garbage_ids:
             self.dictionary.filter_tokens(garbage_ids)
@@ -260,3 +262,24 @@ class FeatureExtractor:
         return len(self.dictionary) if self.dictionary is not None else 0
 
 
+# Plugin registration
+from ..base import PluginMetadata, PluginType
+from ..registry import registry
+
+metadata = PluginMetadata(
+    name="bow",
+    display_name="Bag-of-Words",
+    description="Basic bag-of-words feature extraction using Gensim dictionary",
+    plugin_type=PluginType.FEATURE_EXTRACTOR,
+    dependencies=["gensim>=4.3", "scipy>=1.8"],
+    supports_streaming=True,
+    performance_tier="fast",
+    quality_tier="basic",
+    memory_usage="low",
+    default_params={},
+)
+
+registry.register(
+    metadata=metadata,
+    factory=lambda **kwargs: FeatureExtractor(**kwargs)
+)

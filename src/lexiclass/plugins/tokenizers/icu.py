@@ -1,3 +1,5 @@
+"""ICU-based tokenizer plugin."""
+
 from __future__ import annotations
 
 import importlib
@@ -92,3 +94,25 @@ class ICUTokenizer:
             ]))
 
 
+# Plugin registration
+from ..base import PluginMetadata, PluginType
+from ..registry import registry
+
+metadata = PluginMetadata(
+    name="icu",
+    display_name="PyICU",
+    description="Locale-aware tokenizer using ICU word boundaries with regex fallback",
+    plugin_type=PluginType.TOKENIZER,
+    dependencies=[],  # PyICU is optional, has fallback
+    optional_dependencies=["PyICU>=2.11"],
+    supports_streaming=True,
+    performance_tier="fast",
+    quality_tier="good",
+    memory_usage="low",
+    default_params={"locale": "en"},
+)
+
+registry.register(
+    metadata=metadata,
+    factory=lambda **kwargs: ICUTokenizer(**kwargs)
+)
