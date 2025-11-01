@@ -179,7 +179,7 @@ class FeatureExtractor:
         return self.fit(documents).transform(documents)
 
     def tokens_to_bow(self, tokens: List[str]) -> List[tuple[int, float]]:
-        if not self.dictionary:
+        if self.dictionary is None:
             raise ValueError("FeatureExtractor must be fitted before tokens_to_bow")
         return self.dictionary.doc2bow(tokens)
 
@@ -232,6 +232,17 @@ class FeatureExtractor:
         if garbage_ids:
             self.dictionary.filter_tokens(garbage_ids)
 
+        # Log warning if dictionary is empty after filtering
+        if len(self.dictionary) == 0:
+            logger.warning(
+                "Dictionary is empty after filtering. This means no valid features could be extracted. "
+                "Possible causes: (1) Documents are too short or contain only stop words, "
+                "(2) All tokens appear in too many or too few documents, "
+                "(3) Documents have insufficient vocabulary diversity. "
+                f"Original corpus size: {num_docs} documents. "
+                "Consider using longer documents with more varied content."
+            )
+
     def _is_garbage_token(self, token: str) -> bool:
         token_len = len(token)
         alpha_count = sum(c.isalpha() for c in token)
@@ -246,6 +257,6 @@ class FeatureExtractor:
         return False
 
     def num_features(self) -> int:
-        return len(self.dictionary) if self.dictionary else 0
+        return len(self.dictionary) if self.dictionary is not None else 0
 
 
