@@ -74,6 +74,39 @@ class DocumentLoader:
                 logger.warning("Failed to load document: %s", doc_id)
 
     @staticmethod
+    def iter_documents_from_paths(
+        document_paths: list[tuple[str, str]]
+    ) -> Iterator[Tuple[str, str]]:
+        """Iterate documents from a list of (doc_id, filepath) tuples.
+
+        Memory-efficient: Streams documents one at a time, only loading one
+        document into memory at a time. Ideal for database-driven workflows
+        where document paths are stored in a database.
+
+        Args:
+            document_paths: List of (doc_id, filepath) tuples where:
+                - doc_id: Document identifier (string)
+                - filepath: Absolute or relative path to the .txt file
+
+        Yields:
+            Tuple of (doc_id, text) for each successfully loaded document
+
+        Example:
+            >>> paths = [
+            ...     ("doc_1", "/data/docs/doc_1.txt"),
+            ...     ("doc_2", "/data/docs/doc_2.txt"),
+            ... ]
+            >>> for doc_id, text in DocumentLoader.iter_documents_from_paths(paths):
+            ...     print(f"Loaded {doc_id}: {len(text)} chars")
+        """
+        for doc_id, filepath in document_paths:
+            text, error = DocumentLoader.load_text_file(filepath)
+            if error is None:
+                yield doc_id, text
+            else:
+                logger.warning("Failed to load document %s from %s: %s", doc_id, filepath, error)
+
+    @staticmethod
     def iter_documents_from_directory_parallel(
         directory: str,
         *,
