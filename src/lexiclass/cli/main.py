@@ -63,16 +63,20 @@ def build_index(
     Use 'lexiclass plugins list' to see all available plugins.
     """
     # Create plugin instances using new registry API
+    # Track parameters used for metadata
+    tokenizer_kwargs = {'locale': locale} if tokenizer == 'icu' else {}
+
     try:
-        kwargs = {'locale': locale} if tokenizer == 'icu' else {}
-        tokenizer_obj = registry.create(tokenizer, plugin_type=PluginType.TOKENIZER, **kwargs)
+        tokenizer_obj = registry.create(tokenizer, plugin_type=PluginType.TOKENIZER, **tokenizer_kwargs)
     except Exception as e:
         typer.echo(f"Error creating tokenizer '{tokenizer}': {e}", err=True)
         typer.echo(f"Available tokenizers: {', '.join(registry.list_plugins(PluginType.TOKENIZER))}", err=True)
         raise typer.Exit(code=1)
 
+    # Track feature extractor parameters
+    feature_extractor_kwargs = {}
     try:
-        feature_extractor = registry.create(features, plugin_type=PluginType.FEATURE_EXTRACTOR)
+        feature_extractor = registry.create(features, plugin_type=PluginType.FEATURE_EXTRACTOR, **feature_extractor_kwargs)
     except Exception as e:
         typer.echo(f"Error creating feature extractor '{features}': {e}", err=True)
         typer.echo(f"Available feature extractors: {', '.join(registry.list_plugins(PluginType.FEATURE_EXTRACTOR))}", err=True)
@@ -92,10 +96,12 @@ def build_index(
         document_stream_factory=document_stream_factory,
         token_cache_path=str(token_cache_path) if token_cache_path else None,
         auto_cache_tokens=auto_cache_tokens,
+        tokenizer_name=tokenizer,
+        feature_extractor_name=features,
+        tokenizer_params=tokenizer_kwargs,
+        feature_extractor_params=feature_extractor_kwargs,
     )
-    with open(str(index_path) + '.extractor', 'wb') as f:
-        import pickle
-        pickle.dump(feature_extractor, f, protocol=2)
+    # Note: save_index() now handles saving tokenizer and feature_extractor
     typer.echo(f"Index built and saved to {index_path}")
 
 
