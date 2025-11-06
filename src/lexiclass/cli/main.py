@@ -6,6 +6,7 @@ import numpy as np
 import typer
 
 from lexiclass.index import DocumentIndex
+from lexiclass.classifier import DocumentClassifier
 from lexiclass.plugins import registry, PluginType
 from lexiclass.io import DocumentLoader, load_labels
 from lexiclass.config import get_settings
@@ -118,60 +119,25 @@ def train(
 
     Use 'lexiclass plugins list --type classifier' to see all available classifiers.
     """
-
     try:
-        classifier_obj = registry.create(classifier, plugin_type=PluginType.CLASSIFIER)
+        # Load index and create classifier using the library API
+        doc_classifier = DocumentClassifier.load_index(str(index_path))
+        doc_classifier.set_classifier(classifier)
+
+        # Train (handles all orchestration internally)
+        typer.echo(f"Training {classifier} classifier...")
+        doc_classifier.train(str(labels_file))
+
+        # Save model
+        doc_classifier.save(str(model_path), index_path=str(index_path))
+
+        typer.echo(f"Model trained and saved to {model_path}")
+
     except Exception as e:
-        typer.echo(f"Error creating classifier '{classifier}': {e}", err=True)
-        typer.echo(f"Available classifiers: {', '.join(registry.list_plugins(PluginType.CLASSIFIER))}", err=True)
+        typer.echo(f"Error: {e}", err=True)
+        if "not found" in str(e).lower():
+            typer.echo(f"Available classifiers: {', '.join(registry.list_plugins(PluginType.CLASSIFIER))}", err=True)
         raise typer.Exit(code=1)
-
-    # Load index and extract features
-    index = DocumentIndex.load_index(str(index_path))
-    labels_dict = load_labels(str(labels_file))
-
-    # Extract feature vectors for training documents
-    import pickle
-    from scipy import sparse
-    import numpy as np
-
-    doc_ids = list(labels_dict.keys())
-    feature_vectors = []
-    valid_labels = []
-
-    for doc_id in doc_ids:
-        if doc_id in index.doc2idx:
-            idx = index.doc2idx[doc_id]
-            vector = index.index.vector_by_id(idx)
-            feature_vectors.append(vector)
-            valid_labels.append(labels_dict[doc_id])
-
-    if not feature_vectors:
-        typer.echo("Error: No documents found in index matching the labels file", err=True)
-        raise typer.Exit(code=1)
-
-    # Stack vectors into matrix (handle both sparse and dense)
-    # Check if vectors are sparse or dense
-    if sparse.issparse(feature_vectors[0]):
-        # Sparse features (e.g., TF-IDF, BoW)
-        feature_matrix = sparse.vstack(feature_vectors)
-    else:
-        # Dense features (e.g., Sentence-BERT, FastText)
-        feature_matrix = np.vstack(feature_vectors)
-
-    # Train classifier
-    typer.echo(f"Training {classifier} classifier on {len(valid_labels)} documents...")
-    classifier_obj.train(feature_matrix, valid_labels)
-
-    # Save classifier and index path
-    with open(str(model_path), 'wb') as f:
-        pickle.dump({
-            'classifier': classifier_obj,
-            'classifier_type': classifier,
-            'index_path': str(index_path),
-        }, f, protocol=2)
-
-    typer.echo(f"Model trained and saved to {model_path}")
 
 
 @app.command()
@@ -185,91 +151,39 @@ def predict(
 
     The classifier type is automatically detected from the model file.
     """
-    import pickle
-    from scipy import sparse
-
-    # Try to load as plugin-based classifier first
     try:
-        with open(str(model_path), 'rb') as f:
-            model_data = pickle.load(f)
+        # Load model using the library API
+        doc_classifier = DocumentClassifier.load(str(model_path), index_path=str(index_path))
 
-        # Check if it's a plugin-based classifier
-        # if isinstance(model_data, dict) and 'classifier_type' in model_data:
-        classifier_obj = model_data['classifier']
-        classifier_type = model_data['classifier_type']
-        stored_index_path = model_data.get('index_path', str(index_path))
+        typer.echo(f"Using {doc_classifier.classifier_name} classifier")
 
-        typer.echo(f"Using {classifier_type} classifier")
+        # Predict (handles all orchestration internally)
+        typer.echo(f"Making predictions...")
+        predictions = doc_classifier.predict(str(data_dir))
 
-        # Load index
-        index = DocumentIndex.load_index(stored_index_path)
-
-        # Load documents
-        docs = DocumentLoader.load_documents_from_directory(str(data_dir))
-
-        # Extract features for prediction
-        doc_ids = list(docs.keys())
-        feature_vectors = []
-
-        # Load feature extractor
-        with open(stored_index_path + '.extractor', 'rb') as f:
-            feature_extractor = pickle.load(f)
-
-        # For each document, tokenize and extract features
-        for doc_id in doc_ids:
-            text = docs[doc_id]
-            # Use the tokenizer from the index (we need to reconstruct it)
-            # For now, we'll use the document index approach
-            if doc_id in index.doc2idx:
-                idx = index.doc2idx[doc_id]
-                vector = index.index.vector_by_id(idx)
-                feature_vectors.append(vector)
-            else:
-                # Document not in index, need to tokenize and extract features
-                # This requires access to the tokenizer which we don't have saved
-                # For simplicity, we'll skip documents not in the index
-                typer.echo(f"Warning: Document {doc_id} not found in index, skipping", err=True)
-                continue
-
-        if not feature_vectors:
-            typer.echo("Error: No documents found for prediction", err=True)
+        if not predictions:
+            typer.echo("Warning: No predictions generated", err=True)
             raise typer.Exit(code=1)
 
-        # Stack vectors into matrix (handle both sparse and dense)
-        import numpy as np
-        if sparse.issparse(feature_vectors[0]):
-            # Sparse features (e.g., TF-IDF, BoW)
-            feature_matrix = sparse.vstack(feature_vectors)
+        # Output predictions (CLI responsibility - formatting only)
+        if output:
+            parent_dir = os.path.dirname(output)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
+            with open(output, 'w', encoding='utf-8') as f:
+                for doc_id, (label, score) in predictions.items():
+                    f.write(f"{doc_id}\t{label}\t{score:.6f}\n")
+            typer.echo(f"Predictions written to {output} ({len(predictions)} documents)")
         else:
-            # Dense features (e.g., Sentence-BERT, FastText)
-            feature_matrix = np.vstack(feature_vectors)
-
-        # Predict
-        typer.echo(f"Making predictions on {len(doc_ids)} documents...")
-        predictions, scores = classifier_obj.predict(feature_matrix)
-
-        # Format results
-        preds = {}
-        for i, doc_id in enumerate(doc_ids):
-            if i < len(predictions):
-                preds[doc_id] = (predictions[i], float(scores[i]))
+            # Show first 20 predictions
+            for doc_id, (label, score) in list(predictions.items())[:20]:
+                typer.echo(f"{doc_id}\t{label}\t{score:.4f}")
+            if len(predictions) > 20:
+                typer.echo(f"... ({len(predictions) - 20} more predictions)")
 
     except Exception as e:
-        typer.echo(f"Error loading model: {e}", err=True)
+        typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1)
-
-    # Output predictions
-    if output:
-        parent_dir = os.path.dirname(output)
-        if parent_dir:
-            os.makedirs(parent_dir, exist_ok=True)
-        with open(output, 'w', encoding='utf-8') as f:
-            for doc_id, (label, score) in preds.items():
-                f.write(f"{doc_id}\t{label}\t{score:.6f}\n")
-        typer.echo(f"Predictions written to {output}")
-    else:
-        for doc_id, (label, score) in list(preds.items())[:20]:
-            typer.echo(f"{doc_id}\t{label}\t{score:.4f}")
 
 
 @app.command()
