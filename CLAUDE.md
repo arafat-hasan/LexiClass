@@ -257,7 +257,16 @@ When building an index at path `my_index`, the following files are created:
 
 - `my_index`: Gensim Similarity index (Similarity.* shards)
 - `my_index.doc2idx`: Pickled doc_id → index mapping
+- `my_index.tokenizer`: Pickled Tokenizer instance (NEW in 0.3.0)
 - `my_index.extractor`: Pickled FeatureExtractor (dictionary)
+- `my_index.metadata.json`: JSON metadata about plugins and build info (NEW in 0.3.0)
 - `my_index.tokens.jsonl.gz`: Token cache (if auto_cache_tokens=True)
+
+**Index Metadata (NEW in 0.3.0)**: The index now stores complete metadata about the tokenizer and feature extractor used, including:
+- Plugin names (e.g., "icu", "tfidf")
+- Plugin parameters (e.g., `{"locale": "en"}`)
+- Build information (version, timestamp, document count)
+
+This enables reproducibility and validation. When loading an index, all components are automatically loaded together.
 
 When saving a model, provide `index_path` to save index artifacts alongside model pickle.
