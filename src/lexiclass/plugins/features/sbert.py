@@ -163,6 +163,89 @@ class SentenceBERTFeatureExtractor:
         """
         return self._vector_size if self._vector_size else 0
 
+    def save(self, path: str) -> None:
+        """Save Sentence-BERT extractor to disk.
+
+        Args:
+            path: Directory path to save the extractor
+        """
+        import os
+        import pickle
+
+        if not self.fitted:
+            logger.warning("Saving unfitted SentenceBERTFeatureExtractor")
+
+        # Create directory if it doesn't exist
+        os.makedirs(path, exist_ok=True)
+
+        # Save the model using sentence-transformers' save method
+        model_dir = os.path.join(path, "model")
+        if self.model:
+            self.model.save(model_dir)
+
+        # Save metadata
+        metadata_path = os.path.join(path, "metadata.pkl")
+        metadata = {
+            'model_name': self.model_name,
+            'device': self.device,
+            'batch_size': self.batch_size,
+            'normalize_embeddings': self.normalize_embeddings,
+            'show_progress': self.show_progress,
+            'fitted': self.fitted,
+            '_vector_size': self._vector_size,
+        }
+
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+
+        logger.info(f"SentenceBERTFeatureExtractor saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "SentenceBERTFeatureExtractor":
+        """Load Sentence-BERT extractor from disk.
+
+        Args:
+            path: Directory path to the saved extractor
+
+        Returns:
+            Loaded SentenceBERTFeatureExtractor instance
+        """
+        import os
+        import pickle
+
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "Loading Sentence-BERT requires sentence-transformers. "
+                "Install with: pip install sentence-transformers"
+            )
+
+        # Load metadata
+        metadata_path = os.path.join(path, "metadata.pkl")
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            model_name=metadata['model_name'],
+            device=metadata['device'],
+            batch_size=metadata['batch_size'],
+            normalize_embeddings=metadata['normalize_embeddings'],
+            show_progress=metadata['show_progress'],
+        )
+
+        # Load the model
+        model_dir = os.path.join(path, "model")
+        instance.model = SentenceTransformer(model_dir, device=metadata['device'])
+
+        # Restore state
+        instance.fitted = metadata['fitted']
+        instance._vector_size = metadata['_vector_size']
+
+        logger.info(f"SentenceBERTFeatureExtractor loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType

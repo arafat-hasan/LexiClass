@@ -215,6 +215,85 @@ class FastTextFeatureExtractor:
         """
         return self.vector_size
 
+    def save(self, path: str) -> None:
+        """Save FastText feature extractor to disk.
+
+        Args:
+            path: Path to save the extractor
+        """
+        import pickle
+
+        if not self.fitted:
+            logger.warning("Saving unfitted FastTextFeatureExtractor")
+
+        # Save using Gensim's native save method
+        model_path = f"{path}.model"
+        if self.model:
+            self.model.save(model_path)
+
+        # Save metadata
+        metadata_path = f"{path}.metadata.pkl"
+        metadata = {
+            'vector_size': self.vector_size,
+            'window': self.window,
+            'min_count': self.min_count,
+            'workers': self.workers,
+            'sg': self.sg,
+            'min_n': self.min_n,
+            'max_n': self.max_n,
+            'fitted': self.fitted,
+        }
+
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+
+        logger.info(f"FastTextFeatureExtractor saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "FastTextFeatureExtractor":
+        """Load FastText feature extractor from disk.
+
+        Args:
+            path: Path to the saved extractor
+
+        Returns:
+            Loaded FastTextFeatureExtractor instance
+        """
+        import pickle
+
+        try:
+            from gensim.models import FastText
+        except ImportError:
+            raise ImportError(
+                "Loading FastText requires gensim. Install with: pip install gensim"
+            )
+
+        # Load metadata
+        metadata_path = f"{path}.metadata.pkl"
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            vector_size=metadata['vector_size'],
+            window=metadata['window'],
+            min_count=metadata['min_count'],
+            workers=metadata['workers'],
+            sg=metadata['sg'],
+            min_n=metadata['min_n'],
+            max_n=metadata['max_n'],
+        )
+
+        # Load the model using Gensim's load method
+        model_path = f"{path}.model"
+        instance.model = FastText.load(model_path)
+
+        # Restore state
+        instance.fitted = metadata['fitted']
+
+        logger.info(f"FastTextFeatureExtractor loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType

@@ -258,6 +258,99 @@ class TransformerClassifier:
 
         return list(predictions), scores
 
+    def save(self, path: str) -> None:
+        """Save transformer classifier to disk.
+
+        Args:
+            path: Directory path to save the classifier
+        """
+        import pickle
+
+        if not self.is_fitted:
+            logger.warning("Saving unfitted transformer classifier")
+
+        # Create directory if it doesn't exist
+        os.makedirs(path, exist_ok=True)
+
+        # Save model and tokenizer using HuggingFace methods
+        model_dir = os.path.join(path, "model")
+        self.model.save_pretrained(model_dir)
+        self.tokenizer.save_pretrained(model_dir)
+
+        # Save metadata and encoder
+        metadata_path = os.path.join(path, "metadata.pkl")
+        metadata = {
+            'label_encoder': self.label_encoder,
+            'is_multilabel': self.is_multilabel,
+            'is_fitted': self.is_fitted,
+            'model_name': self.model_name,
+            'num_epochs': self.num_epochs,
+            'batch_size': self.batch_size,
+            'learning_rate': self.learning_rate,
+            'max_length': self.max_length,
+            'device': self.device,
+            'eval_steps': self.eval_steps,
+            'save_steps': self.save_steps,
+            'logging_steps': self.logging_steps,
+            'warmup_steps': self.warmup_steps,
+        }
+
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+
+        logger.info(f"Transformer classifier saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "TransformerClassifier":
+        """Load transformer classifier from disk.
+
+        Args:
+            path: Directory path to the saved classifier
+
+        Returns:
+            Loaded TransformerClassifier instance
+        """
+        import pickle
+
+        try:
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        except ImportError:
+            raise ImportError(
+                "Loading transformer requires transformers. Install with: pip install transformers torch"
+            )
+
+        # Load metadata
+        metadata_path = os.path.join(path, "metadata.pkl")
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            model_name=metadata['model_name'],
+            num_epochs=metadata['num_epochs'],
+            batch_size=metadata['batch_size'],
+            learning_rate=metadata['learning_rate'],
+            max_length=metadata['max_length'],
+            device=metadata['device'],
+            eval_steps=metadata['eval_steps'],
+            save_steps=metadata['save_steps'],
+            logging_steps=metadata['logging_steps'],
+            warmup_steps=metadata['warmup_steps'],
+        )
+
+        # Load model and tokenizer
+        model_dir = os.path.join(path, "model")
+        instance.model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+        instance.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+
+        # Restore state
+        instance.label_encoder = metadata['label_encoder']
+        instance.is_multilabel = metadata['is_multilabel']
+        instance.is_fitted = metadata['is_fitted']
+
+        logger.info(f"Transformer classifier loaded from {path}")
+        return instance
+
     def __del__(self):
         """Cleanup temporary directory if created."""
         if self._temp_dir and os.path.exists(self._temp_dir):

@@ -9,6 +9,15 @@ class TokenizerProtocol(Protocol):
     def tokenize(self, text: str) -> List[str]:
         ...
 
+    def save(self, path: str) -> None:
+        """Save tokenizer to disk."""
+        ...
+
+    @classmethod
+    def load(cls, path: str) -> "TokenizerProtocol":
+        """Load tokenizer from disk."""
+        ...
+
 
 class FeatureExtractorProtocol(Protocol):
     def fit(self, documents: List[List[str]]) -> "FeatureExtractorProtocol":
@@ -24,6 +33,15 @@ class FeatureExtractorProtocol(Protocol):
         ...
 
     def tokens_to_bow(self, tokens: List[str]) -> List[Tuple[int, float]]:
+        ...
+
+    def save(self, path: str) -> None:
+        """Save feature extractor to disk."""
+        ...
+
+    @classmethod
+    def load(cls, path: str) -> "FeatureExtractorProtocol":
+        """Load feature extractor from disk."""
         ...
 
 
@@ -51,6 +69,15 @@ class ClassifierProtocol(Protocol):
         ...
 
     def predict(self, documents: Dict[str, str]):
+        ...
+
+    def save(self, path: str) -> None:
+        """Save classifier to disk."""
+        ...
+
+    @classmethod
+    def load(cls, path: str) -> "ClassifierProtocol":
+        """Load classifier from disk."""
         ...
 
 

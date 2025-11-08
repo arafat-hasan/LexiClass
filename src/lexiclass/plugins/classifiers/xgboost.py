@@ -191,6 +191,71 @@ class XGBoostClassifier:
 
             return list(predictions), max_probs
 
+    def save(self, path: str) -> None:
+        """Save XGBoost classifier to disk using pickle.
+
+        Args:
+            path: Path to save the classifier
+        """
+        import pickle
+
+        if not self.is_fitted:
+            logger.warning("Saving unfitted XGBoost classifier")
+
+        model_data = {
+            'model': self.model,
+            'label_encoder': self.label_encoder,
+            'is_multilabel': self.is_multilabel,
+            'is_fitted': self.is_fitted,
+            'max_depth': self.max_depth,
+            'learning_rate': self.learning_rate,
+            'n_estimators': self.n_estimators,
+            'objective': self.objective,
+            'use_gpu': self.use_gpu,
+            'random_state': self.random_state,
+            'kwargs': self.kwargs,
+        }
+
+        with open(path, 'wb') as f:
+            pickle.dump(model_data, f)
+
+        logger.info(f"XGBoost classifier saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "XGBoostClassifier":
+        """Load XGBoost classifier from disk.
+
+        Args:
+            path: Path to the saved classifier
+
+        Returns:
+            Loaded XGBoostClassifier instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            model_data = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            max_depth=model_data['max_depth'],
+            learning_rate=model_data['learning_rate'],
+            n_estimators=model_data['n_estimators'],
+            objective=model_data['objective'],
+            use_gpu=model_data['use_gpu'],
+            random_state=model_data['random_state'],
+            **model_data['kwargs'],
+        )
+
+        # Restore state
+        instance.model = model_data['model']
+        instance.label_encoder = model_data['label_encoder']
+        instance.is_multilabel = model_data['is_multilabel']
+        instance.is_fitted = model_data['is_fitted']
+
+        logger.info(f"XGBoost classifier loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType
