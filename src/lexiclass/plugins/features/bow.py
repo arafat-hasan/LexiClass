@@ -261,6 +261,53 @@ class FeatureExtractor:
     def num_features(self) -> int:
         return len(self.dictionary) if self.dictionary is not None else 0
 
+    def save(self, path: str) -> None:
+        """Save feature extractor to disk.
+
+        Args:
+            path: Path to save the feature extractor
+        """
+        import pickle
+
+        if not self.fitted:
+            logger.warning("Saving unfitted FeatureExtractor")
+
+        model_data = {
+            'dictionary': self.dictionary,
+            'fitted': self.fitted,
+            'num_workers': self.num_workers,
+        }
+
+        with open(path, 'wb') as f:
+            pickle.dump(model_data, f)
+
+        logger.info(f"FeatureExtractor saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "FeatureExtractor":
+        """Load feature extractor from disk.
+
+        Args:
+            path: Path to the saved feature extractor
+
+        Returns:
+            Loaded FeatureExtractor instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            model_data = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(num_workers=model_data.get('num_workers'))
+
+        # Restore state
+        instance.dictionary = model_data['dictionary']
+        instance.fitted = model_data['fitted']
+
+        logger.info(f"FeatureExtractor loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType
