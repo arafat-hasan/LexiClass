@@ -122,6 +122,71 @@ class SVMClassifier:
 
         return list(predictions), max_scores
 
+    def save(self, path: str) -> None:
+        """Save SVM classifier to disk using pickle.
+
+        Args:
+            path: Path to save the classifier
+        """
+        import pickle
+
+        if not self.is_fitted:
+            logger.warning("Saving unfitted SVM classifier")
+
+        model_data = {
+            'classifier': self.classifier,
+            'encoder': self.encoder,
+            'is_multilabel': self.is_multilabel,
+            'is_fitted': self.is_fitted,
+            'loss': self.loss,
+            'penalty': self.penalty,
+            'tol': self.tol,
+            'dual': self.dual,
+            'C': self.C,
+            'max_iter': self.max_iter,
+            'random_state': self.random_state,
+        }
+
+        with open(path, 'wb') as f:
+            pickle.dump(model_data, f)
+
+        logger.info(f"SVM classifier saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "SVMClassifier":
+        """Load SVM classifier from disk.
+
+        Args:
+            path: Path to the saved classifier
+
+        Returns:
+            Loaded SVMClassifier instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            model_data = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            loss=model_data['loss'],
+            penalty=model_data['penalty'],
+            tol=model_data['tol'],
+            dual=model_data['dual'],
+            C=model_data['C'],
+            max_iter=model_data['max_iter'],
+            random_state=model_data['random_state'],
+        )
+
+        # Restore state
+        instance.classifier = model_data['classifier']
+        instance.encoder = model_data['encoder']
+        instance.is_multilabel = model_data['is_multilabel']
+        instance.is_fitted = model_data['is_fitted']
+
+        logger.info(f"SVM classifier loaded from {path}")
+        return instance
+
     def _setup_encoder_and_classifier(self, labels: List[Union[str, List[str]]]) -> None:
         """Setup encoder and classifier based on label structure."""
         sample_label = labels[0]

@@ -364,6 +364,61 @@ class TfidfFeatureExtractor:
             return True
         return False
 
+    def save(self, path: str) -> None:
+        """Save TF-IDF feature extractor to disk.
+
+        Args:
+            path: Path to save the feature extractor
+        """
+        import pickle
+
+        if not self.fitted:
+            logger.warning("Saving unfitted TfidfFeatureExtractor")
+
+        model_data = {
+            'dictionary': self.dictionary,
+            'tfidf_model': self.tfidf_model,
+            'normalize': self.normalize,
+            'smartirs': self.smartirs,
+            'num_workers': self.num_workers,
+            'fitted': self.fitted,
+        }
+
+        with open(path, 'wb') as f:
+            pickle.dump(model_data, f)
+
+        logger.info(f"TfidfFeatureExtractor saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "TfidfFeatureExtractor":
+        """Load TF-IDF feature extractor from disk.
+
+        Args:
+            path: Path to the saved feature extractor
+
+        Returns:
+            Loaded TfidfFeatureExtractor instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            model_data = pickle.load(f)
+
+        # Create instance with saved parameters
+        instance = cls(
+            normalize=model_data['normalize'],
+            smartirs=model_data['smartirs'],
+            num_workers=model_data.get('num_workers'),
+        )
+
+        # Restore state
+        instance.dictionary = model_data['dictionary']
+        instance.tfidf_model = model_data['tfidf_model']
+        instance.fitted = model_data['fitted']
+
+        logger.info(f"TfidfFeatureExtractor loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType
