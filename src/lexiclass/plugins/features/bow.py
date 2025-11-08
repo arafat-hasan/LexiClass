@@ -33,7 +33,7 @@ class FeatureExtractor:
     def __init__(self, num_workers: Optional[int] = None) -> None:
         self.dictionary: corpora.Dictionary | None = None
         self.fitted: bool = False
-        self.num_workers = num_workers or max(1, mp.cpu_count() - 1)
+        self.num_workers = num_workers if num_workers is not None else max(1, mp.cpu_count() - 1)
 
     def fit(self, documents: List[List[str]]) -> "FeatureExtractor":
         start_time = time.time()
