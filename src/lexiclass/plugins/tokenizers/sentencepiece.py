@@ -195,6 +195,37 @@ class SentencePieceTokenizer:
             except Exception:
                 pass  # Best effort cleanup
 
+    def save(self, path: str) -> None:
+        """Save tokenizer to disk using pickle.
+
+        Args:
+            path: Path to save the tokenizer
+        """
+        import pickle
+
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+
+        logger.info(f"SentencePieceTokenizer saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "SentencePieceTokenizer":
+        """Load tokenizer from disk.
+
+        Args:
+            path: Path to the saved tokenizer
+
+        Returns:
+            Loaded SentencePieceTokenizer instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            instance = pickle.load(f)
+
+        logger.info(f"SentencePieceTokenizer loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType

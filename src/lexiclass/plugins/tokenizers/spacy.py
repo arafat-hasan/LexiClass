@@ -126,6 +126,37 @@ class SpacyTokenizer:
         self.nlp = None
         # Model will be lazily loaded on first use
 
+    def save(self, path: str) -> None:
+        """Save tokenizer to disk using pickle.
+
+        Args:
+            path: Path to save the tokenizer
+        """
+        import pickle
+
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+
+        logger.info(f"SpacyTokenizer saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "SpacyTokenizer":
+        """Load tokenizer from disk.
+
+        Args:
+            path: Path to the saved tokenizer
+
+        Returns:
+            Loaded SpacyTokenizer instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            instance = pickle.load(f)
+
+        logger.info(f"SpacyTokenizer loaded from {path}")
+        return instance
+
 
 # Plugin registration
 from ..base import PluginMetadata, PluginType
