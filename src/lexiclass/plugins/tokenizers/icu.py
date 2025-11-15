@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import re
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 try:
     _ICU_AVAILABLE = importlib.util.find_spec('icu') is not None  # type: ignore[attr-defined]
@@ -92,6 +95,37 @@ class ICUTokenizer:
                 RegularExpressions.MAIL_TO,
                 RegularExpressions.URI,
             ]))
+
+    def save(self, path: str) -> None:
+        """Save tokenizer to disk using pickle.
+
+        Args:
+            path: Path to save the tokenizer
+        """
+        import pickle
+
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+
+        logger.info(f"ICUTokenizer saved to {path}")
+
+    @classmethod
+    def load(cls, path: str) -> "ICUTokenizer":
+        """Load tokenizer from disk.
+
+        Args:
+            path: Path to the saved tokenizer
+
+        Returns:
+            Loaded ICUTokenizer instance
+        """
+        import pickle
+
+        with open(path, 'rb') as f:
+            instance = pickle.load(f)
+
+        logger.info(f"ICUTokenizer loaded from {path}")
+        return instance
 
 
 # Plugin registration
