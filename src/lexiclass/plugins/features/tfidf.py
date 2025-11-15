@@ -50,7 +50,7 @@ class TfidfFeatureExtractor:
         self.tfidf_model: models.TfidfModel | None = None
         self.normalize = normalize
         self.smartirs = smartirs
-        self.num_workers = num_workers or max(1, mp.cpu_count() - 1)
+        self.num_workers = num_workers if num_workers is not None else max(1, mp.cpu_count() - 1)
         self.fitted: bool = False
 
     def fit(self, documents: List[List[str]]) -> "TfidfFeatureExtractor":
