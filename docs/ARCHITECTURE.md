@@ -12,7 +12,7 @@ LexiClass follows a **layered architecture** with **plugin-based extensibility**
 ```
 ┌─────────────────────────────────────────────────────┐
 │              CLI Layer (cli/main.py)                │
-│  - Argument parsing, I/O formatting, user interaction│
+│ - Argument parsing, I/O formatting, user interaction│
 └─────────────────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────┐
@@ -23,7 +23,7 @@ LexiClass follows a **layered architecture** with **plugin-based extensibility**
 └─────────────────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────┐
-│           Core Processing Layer                      │
+│          Core Processing Layer                      │
 │  - Tokenization, Feature Extraction                 │
 │  - Classification, Similarity Search                │
 │  - Evaluation, Encoding                             │
@@ -31,16 +31,16 @@ LexiClass follows a **layered architecture** with **plugin-based extensibility**
                          ↓
 ┌─────────────────────────────────────────────────────┐
 │           Plugin System (Strategy Pattern)          │
-│  - Tokenizers (ICU, spaCy, etc.)                   │
-│  - Feature Extractors (BoW, TF-IDF, etc.)          │
-│  - Classifiers (SVM, XGBoost, Transformer)         │
+│  - Tokenizers (ICU, spaCy, etc.)                    │
+│  - Feature Extractors (BoW, TF-IDF, etc.)           │
+│  - Classifiers (SVM, XGBoost, Transformer)          │
 └─────────────────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────┐
-│           Infrastructure Layer                       │
-│  - I/O (DocumentLoader, label loading)             │
-│  - Config, Logging, Memory Management              │
-│  - Protocol definitions (interfaces.py)            │
+│           Infrastructure Layer                      │
+│  - I/O (DocumentLoader, label loading)              │
+│  - Config, Logging, Memory Management               │
+│  - Protocol definitions (interfaces.py)             │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -157,7 +157,7 @@ classifier = registry.create('xgboost', n_estimators=200)
 
 ## Core Components
 
-### 1. DocumentClassifier (classifier.py) - **NEW**
+### 1. DocumentClassifier (classifier.py)
 
 **Responsibility:** High-level API for document classification workflow.
 

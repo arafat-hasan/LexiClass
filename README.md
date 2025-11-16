@@ -1,6 +1,6 @@
 # LexiClass
 
-**Production-ready, extensible document classification toolkit** with modern ML capabilities and plugin architecture. Choose from 11+ pre-built plugins or create your own.
+**Extensible document classification toolkit** with modern ML capabilities and plugin architecture. Choose from 11+ pre-built plugins or create your own.
 
 **Version:** 0.3.0 | **License:** MIT
 
@@ -141,20 +141,8 @@ predictions = clf.predict(test_docs)
 
 - **[User Guide](docs/USER_GUIDE.md)** - Complete guide to using LexiClass (CLI, library, integrations)
 - **[Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create custom plugins in 30 minutes
-- **[Performance Benchmarks](docs/BENCHMARKS.md)** - Detailed performance comparisons and recommendations
-- **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Upgrade from v0.1.0 to v0.3.0
-
-### Implementation Details
-
-- **[Phase 1 Complete](PHASE1_COMPLETE.md)** - Plugin infrastructure
-- **[Phase 2 Complete](PHASE2_COMPLETE.md)** - Modern ML alternatives
-- **[Phase 3 Complete](PHASE3_COMPLETE.md)** - State-of-the-art transformers
-- **[Phase 4 Complete](PHASE4_COMPLETE.md)** - Production ready
-- **[Implementation Complete](IMPLEMENTATION_COMPLETE.md)** - Overall project summary
 
 ### Project Instructions
-
-- **[CLAUDE.md](CLAUDE.md)** - Development setup and architecture overview
 
 ## Configuration
 
@@ -404,7 +392,6 @@ src/lexiclass/
 - **High quality (90-93%)**: spaCy + FastText + XGBoost
 - **State-of-the-art (93-95%)**: HuggingFace + Sentence-BERT + Transformer (GPU required)
 
-**See [benchmarks](docs/BENCHMARKS.md) for detailed comparisons.**
 
 ## Contributing
 
